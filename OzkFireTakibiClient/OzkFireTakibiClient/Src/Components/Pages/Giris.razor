@@ -21,7 +21,7 @@
                     </div>
                 }
 
-                <EditForm Model="@loginModel" OnValidSubmit="@HandleValidSubmit">
+                <EditForm Model="@loginModel" OnValidSubmit="@HandleValidSubmit" FormName="LoginForm">
                     <DataAnnotationsValidator />
 
                     <div class="mb-3">
@@ -56,7 +56,8 @@
 </div>
 
 @code {
-    private LoginModel loginModel = new();
+    [SupplyParameterFromForm]
+    private LoginModel loginModel { get; set; } = new();
     private string? errorMessage;
     private bool isProcessing;
 

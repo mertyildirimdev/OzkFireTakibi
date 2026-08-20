@@ -69,7 +69,9 @@
     {
         var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         var query = QueryHelpers.ParseQuery(currentUri.Query);
-        var returnUrl = query["returnUrl"].FirstOrDefault();
+        var returnUrl = query.TryGetValue("returnUrl", out var returnUrlValues)
+            ? returnUrlValues.FirstOrDefault()
+            : null;
 
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
