@@ -1,0 +1,95 @@
+@page "/giris"
+@layout EmptyLayout
+
+@using System.ComponentModel.DataAnnotations
+@using OzkFireTakibiClient.Src.Services
+
+@inject LoginService LoginService
+
+<PageTitle>Giriş Yap</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 card-title text-center mb-4">Giriş Yap</h1>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger py-2" role="alert">
+                        @errorMessage
+                    </div>
+                }
+
+                <EditForm Model="@loginModel" OnValidSubmit="@HandleValidSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">E-posta</label>
+                        <InputText id="email" class="form-control" placeholder="ornek@firma.com" @bind-Value="loginModel.Email" />
+                        <ValidationMessage For="@(() => loginModel.Email)" class="text-danger small" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Şifre</label>
+                        <InputText id="password" type="password" class="form-control" placeholder="••••••••" @bind-Value="loginModel.Password" />
+                        <ValidationMessage For="@(() => loginModel.Password)" class="text-danger small" />
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Giriş Yapılıyor...</span>
+                            }
+                            else
+                            {
+                                <span>Giriş Yap</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isProcessing;
+
+    private async Task HandleValidSubmit()
+    {
+        errorMessage = null;
+        isProcessing = true;
+
+        try
+        {
+            var success = await LoginService.LoginAsync(loginModel.Email, loginModel.Password);
+            if (!success)
+            {
+                errorMessage = "E-posta veya şifre hatalı.";
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Giriş işlemi sırasında beklenmeyen bir hata oluştu.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "E-posta adresi gereklidir.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta adresi giriniz.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Şifre gereklidir.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

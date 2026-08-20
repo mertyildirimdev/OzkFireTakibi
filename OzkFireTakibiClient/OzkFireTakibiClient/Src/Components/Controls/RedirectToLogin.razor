@@ -1,0 +1,17 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        var currentUri = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        if (string.IsNullOrEmpty(currentUri) || currentUri.Equals("giris", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/giris", replace: true);
+        }
+        else
+        {
+            var returnUrlParam = Uri.EscapeDataString(currentUri);
+            NavigationManager.NavigateTo($"/giris?returnUrl={returnUrlParam}", replace: true);
+        }
+    }
+}

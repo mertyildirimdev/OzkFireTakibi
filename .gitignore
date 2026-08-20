@@ -1,0 +1,34 @@
+## .NET build output
+**/bin/
+**/obj/
+
+## Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Test and coverage output
+TestResults/
+*.trx
+coverage/
+coverage*.xml
+
+## NuGet and local tooling
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+
+## Local environment and secrets
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+## OS files
+.DS_Store
+Thumbs.db
+desktop.ini

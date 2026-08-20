@@ -1,0 +1,113 @@
+@using Microsoft.AspNetCore.WebUtilities
+@implements IDisposable
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="alert alert-danger m-4" role="alert">
+                        Bu sayfayı görüntülemek için yetkiniz bulunmamaktadır.
+                    </div>
+                }
+                else
+                {
+                    <OzkFireTakibiClient.Src.Components.Controls.RedirectToLogin />
+                }
+            </NotAuthorized>
+            <Authorizing>
+                <div class="d-flex justify-content-center p-4">
+                    <p>Yetkilendirme kontrol ediliyor...</p>
+                </div>
+            </Authorizing>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+
+@code {
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+        NavigationManager.LocationChanged += HandleLocationChanged;
+
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authenticationState.User.Identity?.IsAuthenticated == true;
+    }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = RedirectForAuthenticationStateAsync(authenticationStateTask);
+    }
+
+    private async Task RedirectForAuthenticationStateAsync(Task<AuthenticationState> authenticationStateTask)
+    {
+        var authenticationState = await authenticationStateTask;
+        isAuthenticated = authenticationState.User.Identity?.IsAuthenticated == true;
+
+        await InvokeAsync(() =>
+        {
+            var targetUrl = isAuthenticated ? GetAuthenticatedTargetUrl() : "/giris";
+            NavigateIfNeeded(targetUrl);
+        });
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (isAuthenticated && IsLoginRoute(args.Location))
+        {
+            _ = InvokeAsync(() => NavigateIfNeeded("/"));
+        }
+    }
+
+    private string GetAuthenticatedTargetUrl()
+    {
+        var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(currentUri.Query);
+        var returnUrl = query["returnUrl"].FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return "/";
+        }
+
+        var targetUrl = returnUrl.Trim();
+        if (Uri.TryCreate(targetUrl, UriKind.Absolute, out _) ||
+            targetUrl.StartsWith("//", StringComparison.Ordinal) ||
+            targetUrl.StartsWith('\\') ||
+            IsLoginRoute(targetUrl))
+        {
+            return "/";
+        }
+
+        return targetUrl.StartsWith('/') ? targetUrl : $"/{targetUrl}";
+    }
+
+    private void NavigateIfNeeded(string targetUrl)
+    {
+        var currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var normalizedCurrentUrl = string.IsNullOrEmpty(currentUrl) ? "/" : $"/{currentUrl}";
+
+        if (!string.Equals(normalizedCurrentUrl, targetUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo(targetUrl, replace: true);
+        }
+    }
+
+    private bool IsLoginRoute(string url)
+    {
+        var absoluteUri = NavigationManager.ToAbsoluteUri(url);
+        return absoluteUri.AbsolutePath.Equals("/giris", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+}

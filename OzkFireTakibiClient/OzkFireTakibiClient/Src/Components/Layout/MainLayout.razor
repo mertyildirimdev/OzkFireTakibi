@@ -1,0 +1,51 @@
+@inherits LayoutComponentBase
+@inject LoginService LoginService
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex justify-content-between align-items-center">
+            <div>
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="me-2">👤 @context.User.Identity?.Name</span>
+                        <span class="badge bg-secondary me-3">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                    </Authorized>
+                    <NotAuthorized>
+                        <span class="text-muted">Giriş yapılmadı</span>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+            <div>
+                <AuthorizeView>
+                    <Authorized>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="Logout">Çıkış Yap</button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <NavLink class="btn btn-outline-primary btn-sm" href="giris">Giriş Yap</NavLink>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Beklenmeyen bir hata oluştu.
+    <a href="." class="reload">Yeniden yükle</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private void Logout()
+    {
+        LoginService.Logout();
+    }
+}
