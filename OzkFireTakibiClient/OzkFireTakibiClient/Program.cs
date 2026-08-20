@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OzkFireTakibiClient.Src.Components;
 using OzkFireTakibiClient.Data;
@@ -16,6 +17,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddBaseServices();
+
+builder.Services.AddDataProtection()
+    .SetApplicationName("OzkFireTakibi");
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
