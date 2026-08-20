@@ -10,7 +10,7 @@
             <NotAuthorized>
                 @if (context.User.Identity?.IsAuthenticated == true)
                 {
-                    <div class="alert alert-danger m-4" role="alert">
+                    <div class="notification is-danger is-light m-4" role="alert">
                         Bu sayfayı görüntülemek için yetkiniz bulunmamaktadır.
                     </div>
                 }
@@ -20,7 +20,7 @@
                 }
             </NotAuthorized>
             <Authorizing>
-                <div class="d-flex justify-content-center p-4">
+                <div class="is-flex is-justify-content-center p-4">
                     <p>Yetkilendirme kontrol ediliyor...</p>
                 </div>
             </Authorizing>

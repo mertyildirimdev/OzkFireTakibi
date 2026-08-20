@@ -1,13 +1,17 @@
 @page "/"
-@attribute [Authorize]
 @inherits OzkFireTakibiClient.Src.Components.Controls.AuthRequiredComponent
 
 <PageTitle>Anasayfa</PageTitle>
 
-<div class="container mt-4">
-    <div class="card p-4 shadow-sm">
-        <h1 class="h2">Hoş Geldiniz, @UserName</h1>
-        <p class="text-muted">Kullanıcı Rolü: <span class="badge bg-primary">@UserRole</span></p>
-        <p>Ozk Fire Takibi uygulamasına başarıyla giriş yaptınız.</p>
+<div class="container">
+    <div class="box p-5 mb-5">
+        <h1 class="title is-3 mb-2">Hoş Geldiniz, @UserName</h1>
+        <p class="subtitle is-6 has-text-grey mb-4">
+            Kullanıcı Rolü: <span class="tag is-primary is-light is-rounded">@UserRole</span>
+        </p>
+        <div class="notification is-info is-light">
+            <i class="fas fa-circle-info mr-2"></i>
+            ÖZK Fire Takibi uygulamasına başarıyla giriş yaptınız.
+        </div>
     </div>
 </div>

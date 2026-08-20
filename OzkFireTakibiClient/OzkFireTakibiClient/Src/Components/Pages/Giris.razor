@@ -1,6 +1,5 @@
 @page "/giris"
 @layout EmptyLayout
-@attribute [AllowAnonymous]
 
 @using System.ComponentModel.DataAnnotations
 @using OzkFireTakibiClient.Src.Services
@@ -9,59 +8,135 @@
 
 <PageTitle>Giriş Yap</PageTitle>
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-5 col-lg-4">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h1 class="h3 card-title text-center mb-4">Giriş Yap</h1>
-
-                @if (!string.IsNullOrEmpty(errorMessage))
-                {
-                    <div class="alert alert-danger py-2" role="alert">
-                        @errorMessage
-                    </div>
-                }
-
-                <EditForm Model="@loginModel" OnValidSubmit="@HandleValidSubmit" FormName="LoginForm">
-                    <DataAnnotationsValidator />
-
-                    <div class="mb-3">
-                        <label for="email" class="form-label">E-posta</label>
-                        <InputText id="email" class="form-control" placeholder="ornek@firma.com" @bind-Value="loginModel.Email" />
-                        <ValidationMessage For="@(() => loginModel.Email)" class="text-danger small" />
+<section class="hero is-fullheight login-hero">
+    <div class="hero-body">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-5-tablet is-4-desktop is-3-widescreen">
+                    <div class="has-text-centered mb-5">
+                        <div class="login-logo-container mb-3">
+                            <i class="fas fa-fire-flame-curved fa-2x has-text-primary"></i>
+                        </div>
+                        <h1 class="title is-4 has-text-dark">ÖZK Fire Takibi</h1>
+                        <p class="subtitle is-6 has-text-grey">Lütfen hesabınıza giriş yapın</p>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Şifre</label>
-                        <InputText id="password" type="password" class="form-control" placeholder="••••••••" @bind-Value="loginModel.Password" />
-                        <ValidationMessage For="@(() => loginModel.Password)" class="text-danger small" />
+                    <div class="box login-box p-5">
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="notification is-danger is-light py-2 px-3 mb-4 is-size-7" role="alert">
+                                <button class="delete is-small" @onclick="() => errorMessage = null"></button>
+                                <i class="fas fa-circle-exclamation mr-1"></i>
+                                @errorMessage
+                            </div>
+                        }
+
+                        <EditForm Model="@loginModel" OnValidSubmit="@HandleValidSubmit" FormName="LoginForm">
+                            <DataAnnotationsValidator />
+
+                            <div class="field mb-4">
+                                <label for="email" class="label is-small">E-posta</label>
+                                <div class="control has-icons-left">
+                                    <InputText id="email" class="input" type="email" placeholder="ornek@firma.com" @bind-Value="loginModel.Email" />
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-envelope"></i>
+                                    </span>
+                                </div>
+                                <ValidationMessage For="@(() => loginModel.Email)" class="help is-danger" />
+                            </div>
+
+                            <div class="field mb-4">
+                                <label for="password" class="label is-small">Şifre</label>
+                                <div class="control has-icons-left">
+                                    <InputText id="password" type="password" class="input" placeholder="••••••••" @bind-Value="loginModel.Password" />
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-lock"></i>
+                                    </span>
+                                </div>
+                                <ValidationMessage For="@(() => loginModel.Password)" class="help is-danger" />
+                            </div>
+
+                            <div class="field mb-5">
+                                <div class="control">
+                                    <label class="checkbox is-size-7 is-flex is-align-items-center">
+                                        <InputCheckbox id="rememberMe" class="mr-2" @bind-Value="loginModel.RememberMe" />
+                                        Beni Hatırla
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <div class="control">
+                                    <button type="submit" class="button is-primary is-fullwidth @(isProcessing ? "is-loading" : "")" disabled="@isProcessing">
+                                        <span>Giriş Yap</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </EditForm>
                     </div>
 
-                    <div class="form-check mb-3">
-                        <InputCheckbox id="rememberMe" class="form-check-input" @bind-Value="loginModel.RememberMe" />
-                        <label class="form-check-label" for="rememberMe">
-                            Beni Hatırla
-                        </label>
-                    </div>
-
-                    <div class="d-grid gap-2 mt-4">
-                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">
-                            @if (isProcessing)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                <span>Giriş Yapılıyor...</span>
-                            }
-                            else
-                            {
-                                <span>Giriş Yap</span>
-                            }
-                        </button>
-                    </div>
-                </EditForm>
+                    <p class="has-text-grey has-text-centered is-size-7 mt-4">
+                        &copy; @DateTime.Now.Year ÖZK Fire Takip Sistemi
+                    </p>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
+
+<style>
+    .login-hero {
+        background-color: #f4f6f9 !important;
+        min-height: 100vh;
+    }
+
+    .login-logo-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background-color: rgba(0, 209, 178, 0.12);
+    }
+
+    .login-box {
+        background-color: #ffffff !important;
+        border: 1px solid #e8ecf1 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06) !important;
+    }
+
+    .login-box .label {
+        color: #363636 !important;
+        font-weight: 600;
+    }
+
+    .login-box .input {
+        background-color: #ffffff !important;
+        color: #363636 !important;
+        border-color: #dbdbdb !important;
+        border-radius: 6px !important;
+        box-shadow: inset 0 1px 2px rgba(10, 10, 10, 0.05);
+    }
+
+    .login-box .input:focus {
+        border-color: #00d1b2 !important;
+        box-shadow: 0 0 0 0.125em rgba(0, 209, 178, 0.25) !important;
+    }
+
+    .login-box .icon {
+        color: #7a7a7a !important;
+    }
+
+    .login-box .checkbox {
+        color: #4a4a4a !important;
+    }
+
+    h1:focus, .title:focus {
+        outline: none !important;
+    }
+</style>
 
 @code {
     [SupplyParameterFromForm]

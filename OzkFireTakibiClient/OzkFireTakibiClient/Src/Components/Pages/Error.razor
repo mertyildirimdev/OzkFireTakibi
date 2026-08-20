@@ -1,28 +1,34 @@
-﻿@page "/Error"
+@page "/Error"
 @using System.Diagnostics
 
 <PageTitle>Hata</PageTitle>
 
-<h1 class="text-danger">Hata</h1>
-<h2 class="h4 text-danger">İstek işlenirken bir hata oluştu.</h2>
+<div class="container p-4">
+    <div class="notification is-danger is-light mb-4">
+        <h1 class="title is-4 has-text-danger">Hata</h1>
+        <h2 class="subtitle is-6 has-text-danger-dark">İstek işlenirken bir hata oluştu.</h2>
+    </div>
 
-@if (ShowRequestId)
-{
-    <p>
-        <strong>İstek kimliği:</strong> <code>@RequestId</code>
-    </p>
-}
+    @if (ShowRequestId)
+    {
+        <p class="mb-4">
+            <strong>İstek kimliği:</strong> <code>@RequestId</code>
+        </p>
+    }
 
-<h3>Geliştirme modu</h3>
-<p>
-    <strong>Development</strong> ortamı etkinleştirildiğinde oluşan hatayla ilgili daha ayrıntılı bilgi görüntülenir.
-</p>
-<p>
-    <strong>Development ortamı yayımlanan uygulamalarda etkinleştirilmemelidir.</strong>
-    Aksi halde hata ayrıntılarındaki hassas bilgiler son kullanıcılara gösterilebilir.
-    Yerel hata ayıklama için <strong>ASPNETCORE_ENVIRONMENT</strong> ortam değişkenini <strong>Development</strong>
-    olarak ayarlayın ve uygulamayı yeniden başlatın.
-</p>
+    <div class="box">
+        <h3 class="title is-5">Geliştirme Modu</h3>
+        <p class="mb-3">
+            <strong>Development</strong> ortamı etkinleştirildiğinde oluşan hatayla ilgili daha ayrıntılı bilgi görüntülenir.
+        </p>
+        <p class="is-size-7 has-text-grey">
+            <strong>Development ortamı yayımlanan uygulamalarda etkinleştirilmemelidir.</strong>
+            Aksi halde hata ayrıntılarındaki hassas bilgiler son kullanıcılara gösterilebilir.
+            Yerel hata ayıklama için <strong>ASPNETCORE_ENVIRONMENT</strong> ortam değişkenini <strong>Development</strong>
+            olarak ayarlayın ve uygulamayı yeniden başlatın.
+        </p>
+    </div>
+</div>
 
 @code{
     [CascadingParameter]

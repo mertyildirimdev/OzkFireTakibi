@@ -1,18 +1,23 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Ozk Fire Takibi</a>
-    </div>
+<div class="sidebar-header p-4 is-flex is-align-items-center">
+    <span class="icon is-medium has-text-primary mr-2">
+        <i class="fas fa-fire-flame-curved fa-lg"></i>
+    </span>
+    <span class="is-size-5 has-text-weight-bold has-text-white">ÖZK Fire</span>
 </div>
 
-<input type="checkbox" title="Gezinti menüsü" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Anasayfa
-            </NavLink>
-        </div>
-    </nav>
+<div class="p-4">
+    <aside class="menu">
+        <p class="menu-label has-text-grey-light">Genel</p>
+        <ul class="menu-list">
+            <li>
+                <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+                    <span class="icon mr-2">
+                        <i class="fas fa-house"></i>
+                    </span>
+                    <span>Anasayfa</span>
+                </NavLink>
+            </li>
+        </ul>
+    </aside>
 </div>
 

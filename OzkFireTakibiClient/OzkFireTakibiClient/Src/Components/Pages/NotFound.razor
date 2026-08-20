@@ -1,7 +1,18 @@
-﻿@page "/notfound"
+@page "/notfound"
 @layout MainLayout
 
 <PageTitle>Sayfa Bulunamadı</PageTitle>
 
-<h1 class="h3">Sayfa Bulunamadı</h1>
-<p>Üzgünüz, aradığınız içerik mevcut değil.</p>
+<div class="container">
+    <div class="box p-5 has-text-centered">
+        <span class="icon is-large has-text-warning mb-3">
+            <i class="fas fa-triangle-exclamation fa-3x"></i>
+        </span>
+        <h1 class="title is-4">Sayfa Bulunamadı</h1>
+        <p class="subtitle is-6 has-text-grey">Üzgünüz, aradığınız içerik mevcut değil veya taşınmış olabilir.</p>
+        <a href="" class="button is-primary is-light mt-3">
+            <span class="icon is-small"><i class="fas fa-house"></i></span>
+            <span>Anasayfaya Dön</span>
+        </a>
+    </div>
+</div>

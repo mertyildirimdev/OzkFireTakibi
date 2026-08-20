@@ -1,44 +1,59 @@
 @inherits LayoutComponentBase
 @inject LoginService LoginService
 
-<div class="page">
-    <div class="sidebar">
+<div class="page-layout">
+    <aside class="sidebar-nav">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center">
-            <div>
+    <div class="main-content-wrapper">
+        <header class="top-navbar px-5 py-3 is-flex is-justify-content-space-between is-align-items-center">
+            <div class="is-flex is-align-items-center">
                 <AuthorizeView>
                     <Authorized>
-                        <span class="me-2">👤 @context.User.Identity?.Name</span>
-                        <span class="badge bg-secondary me-3">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                        <span class="has-text-weight-semibold mr-3 is-size-6">
+                            <i class="fas fa-user-circle mr-1 has-text-primary"></i>
+                            @context.User.Identity?.Name
+                        </span>
+                        <span class="tag is-primary is-light is-rounded">
+                            @context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                        </span>
                     </Authorized>
                     <NotAuthorized>
-                        <span class="text-muted">Giriş yapılmadı</span>
+                        <span class="has-text-grey is-size-7">Giriş yapılmadı</span>
                     </NotAuthorized>
                 </AuthorizeView>
             </div>
             <div>
                 <AuthorizeView>
                     <Authorized>
-                        <button class="btn btn-outline-danger btn-sm" @onclick="Logout">Çıkış Yap</button>
+                        <button class="button is-danger is-light is-small" @onclick="Logout">
+                            <span class="icon is-small">
+                                <i class="fas fa-right-from-bracket"></i>
+                            </span>
+                            <span>Çıkış Yap</span>
+                        </button>
                     </Authorized>
                     <NotAuthorized>
-                        <NavLink class="btn btn-outline-primary btn-sm" href="giris">Giriş Yap</NavLink>
+                        <NavLink class="button is-primary is-small" href="giris">
+                            <span class="icon is-small">
+                                <i class="fas fa-arrow-right-to-bracket"></i>
+                            </span>
+                            <span>Giriş Yap</span>
+                        </NavLink>
                     </NotAuthorized>
                 </AuthorizeView>
             </div>
-        </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="page-body p-5">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    Beklenmeyen bir hata oluştu.
+    Bir hata oluştu.
     <a href="." class="reload">Yeniden yükle</a>
     <span class="dismiss">🗙</span>
 </div>
