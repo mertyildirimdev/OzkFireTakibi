@@ -44,3 +44,9 @@ public static class UserRoleHelper
         };
     }
 }
+
+public class AuthSession
+{
+    public int UserId { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+}

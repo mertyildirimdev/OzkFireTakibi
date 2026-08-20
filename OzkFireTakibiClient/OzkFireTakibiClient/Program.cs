@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.EntityFrameworkCore;
 using OzkFireTakibiClient.Src.Components;
 using OzkFireTakibiClient.Data;
@@ -18,6 +19,8 @@ builder.Services.AddBaseServices();
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<ProtectedLocalStorage>();
+builder.Services.AddScoped<ProtectedSessionStorage>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomStateProvider>();
 builder.Services.AddScoped(sp => (CustomStateProvider)sp.GetRequiredService<AuthenticationStateProvider>());
 

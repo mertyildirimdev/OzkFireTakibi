@@ -1,5 +1,6 @@
 @page "/giris"
 @layout EmptyLayout
+@attribute [AllowAnonymous]
 
 @using System.ComponentModel.DataAnnotations
 @using OzkFireTakibiClient.Src.Services
@@ -36,6 +37,13 @@
                         <ValidationMessage For="@(() => loginModel.Password)" class="text-danger small" />
                     </div>
 
+                    <div class="form-check mb-3">
+                        <InputCheckbox id="rememberMe" class="form-check-input" @bind-Value="loginModel.RememberMe" />
+                        <label class="form-check-label" for="rememberMe">
+                            Beni Hatırla
+                        </label>
+                    </div>
+
                     <div class="d-grid gap-2 mt-4">
                         <button type="submit" class="btn btn-primary" disabled="@isProcessing">
                             @if (isProcessing)
@@ -57,18 +65,24 @@
 
 @code {
     [SupplyParameterFromForm]
-    private LoginModel loginModel { get; set; } = new();
+    private LoginModel loginModel { get; set; } = default!;
     private string? errorMessage;
     private bool isProcessing;
 
+    protected override void OnInitialized()
+    {
+        loginModel ??= new();
+    }
+
     private async Task HandleValidSubmit()
     {
+
         errorMessage = null;
         isProcessing = true;
 
         try
         {
-            var success = await LoginService.LoginAsync(loginModel.Email, loginModel.Password);
+            var success = await LoginService.LoginAsync(loginModel.Email, loginModel.Password, loginModel.RememberMe);
             if (!success)
             {
                 errorMessage = "E-posta veya şifre hatalı.";
@@ -92,5 +106,7 @@
 
         [Required(ErrorMessage = "Şifre gereklidir.")]
         public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
     }
 }

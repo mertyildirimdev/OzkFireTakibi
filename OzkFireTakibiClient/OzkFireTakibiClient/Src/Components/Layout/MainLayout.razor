@@ -44,8 +44,8 @@
 </div>
 
 @code {
-    private void Logout()
+    private async Task Logout()
     {
-        LoginService.Logout();
+        await LoginService.LogoutAsync();
     }
 }
