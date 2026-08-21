@@ -1,0 +1,346 @@
+@page "/raporlar/{ImportId:long}"
+@inherits AuthRequiredComponent
+@implements IAsyncDisposable
+@inject ReportImportService ReportImportService
+@using OzkFireTakibiClient.Src.Data.Entities
+
+<PageTitle>Rapor Detayı</PageTitle>
+
+<div class="container">
+    <div class="mb-5">
+        <NavLink class="button is-light is-small mb-4" href="raporlar">
+            <span class="icon"><i class="fas fa-arrow-left"></i></span>
+            <span>Raporlara dön</span>
+        </NavLink>
+
+        @if (detail is not null)
+        {
+            <div class="level">
+                <div class="level-left">
+                    <div>
+                        <div class="is-flex is-align-items-center mb-2">
+                            <h1 class="title is-3 mb-0">Rapor detayı</h1>
+                            <span class="tag ml-3 @(detail.Header.IsActive ? "is-success is-light" : "is-light")">
+                                @(detail.Header.IsActive ? "Aktif sürüm" : "Eski sürüm")
+                            </span>
+                        </div>
+                        <p class="subtitle is-6 has-text-grey">@detail.Header.OriginalFileName</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="notification is-danger is-light" role="alert">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-circle-exclamation"></i></span>
+                <span>@errorMessage</span>
+            </span>
+        </div>
+    }
+
+    @if (isLoading && detail is null)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (detail is not null)
+    {
+        <section class="box mb-5" aria-labelledby="report-info-title">
+            <h2 id="report-info-title" class="title is-5 mb-4">Rapor bilgileri</h2>
+            <div class="columns is-multiline">
+                <div class="column is-one-quarter">
+                    <p class="heading">Kapsam</p>
+                    <p class="has-text-weight-semibold">@ReportDisplayNames.Scope(detail.Header.Scope)</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Rapor türü</p>
+                    <p class="has-text-weight-semibold">@ReportDisplayNames.PeriodType(detail.Header.PeriodType)</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Dönem</p>
+                    <p class="has-text-weight-semibold">
+                        @detail.Header.StartDate.ToString("dd.MM.yyyy") – @detail.Header.EndDate.ToString("dd.MM.yyyy")
+                    </p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Toplam satır</p>
+                    <p class="has-text-weight-semibold">@detail.Header.TotalRowCount.ToString("N0")</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Yükleyen</p>
+                    <p>@detail.Header.UploadedBy</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Yüklenme zamanı</p>
+                    <p>@detail.Header.ImportedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Rapor No</p>
+                    <p>#@detail.Header.Id</p>
+                </div>
+                <div class="column is-one-quarter">
+                    <p class="heading">Bağlı dönem No</p>
+                    <p>#@detail.Header.ReportPeriodId</p>
+                </div>
+            </div>
+        </section>
+
+        @if (detail.Header.GeneralSummary is not null)
+        {
+            <section class="box mb-5" aria-labelledby="summary-title">
+                <h2 id="summary-title" class="title is-5 mb-4">Genel sonuç</h2>
+                <div class="columns is-multiline">
+                    <div class="column is-one-third">
+                        <p class="heading">Mağaza satış tutarı</p>
+                        <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.StoreSalesAmount)</p>
+                    </div>
+                    <div class="column is-one-third">
+                        <p class="heading">Satış maliyeti</p>
+                        <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.CostOfSales)</p>
+                    </div>
+                    <div class="column is-one-third">
+                        <p class="heading">Fire</p>
+                        <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.WasteRate)</p>
+                        <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.WasteAmount)</p>
+                    </div>
+                    <div class="column is-one-third">
+                        <p class="heading">Kâr</p>
+                        <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.ProfitRate)</p>
+                        <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.ProfitAmount)</p>
+                    </div>
+                    <div class="column is-one-third">
+                        <p class="heading">Fire miktarı</p>
+                        <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.WasteQuantity)</p>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="box" aria-labelledby="rows-title">
+            <h2 id="rows-title" class="title is-5 mb-4">Excel satırları</h2>
+
+            <div class="tabs is-toggle is-toggle-rounded is-small">
+                <ul>
+                    @foreach (var rowType in rowTypes)
+                    {
+                        <li class="@(selectedRowType == rowType ? "is-active" : null)">
+                            <a role="button" @onclick="() => SelectRowTypeAsync(rowType)">
+                                <span>@ReportDisplayNames.RowType(rowType)</span>
+                                <span class="tag ml-2">@detail.Header.Count(rowType).ToString("N0")</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <div class="field has-addons mb-4">
+                <div class="control is-expanded">
+                    <input class="input"
+                           type="search"
+                           maxlength="100"
+                           placeholder="Mağaza, kategori veya ürün ara"
+                           @bind="searchText"
+                           @bind:event="oninput" />
+                </div>
+                <div class="control">
+                    <button class="button is-primary"
+                            type="button"
+                            disabled="@isLoading"
+                            @onclick="SearchAsync">
+                        <span class="icon"><i class="fas fa-search"></i></span>
+                        <span>Ara</span>
+                    </button>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(detail.SearchText))
+                {
+                    <div class="control">
+                        <button class="button is-light" type="button" disabled="@isLoading" @onclick="ClearSearchAsync">
+                            Temizle
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (isLoading)
+            {
+                <progress class="progress is-small is-primary" max="100">Yükleniyor</progress>
+            }
+            else if (detail.Rows.Count == 0)
+            {
+                <div class="notification is-light has-text-centered">Bu filtreye uygun satır bulunamadı.</div>
+            }
+            else
+            {
+                <div class="table-container">
+                    <table class="table is-fullwidth is-hoverable is-striped is-narrow">
+                        <thead>
+                            <tr>
+                                <th>Excel satırı</th>
+                                <th>Mağaza</th>
+                                <th>Kategori</th>
+                                <th>Ürün</th>
+                                <th class="has-text-right">Satış tutarı</th>
+                                <th class="has-text-right">Satış maliyeti</th>
+                                <th class="has-text-right">Fire oranı</th>
+                                <th class="has-text-right">Fire tutarı</th>
+                                <th class="has-text-right">Kâr oranı</th>
+                                <th class="has-text-right">Kâr tutarı</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in detail.Rows)
+                            {
+                                <tr>
+                                    <td>@row.SourceRowNumber</td>
+                                    <td>@DisplayStore(row)</td>
+                                    <td>@DisplayCodeAndName(row.CategoryCode, row.CategoryName)</td>
+                                    <td>@DisplayCodeAndName(row.StockCode, row.StockName)</td>
+                                    <td class="has-text-right">@FormatNumber(row.StoreSalesAmount)</td>
+                                    <td class="has-text-right">@FormatNumber(row.CostOfSales)</td>
+                                    <td class="has-text-right">@FormatRate(row.WasteRate)</td>
+                                    <td class="has-text-right">@FormatNumber(row.WasteAmount)</td>
+                                    <td class="has-text-right">@FormatRate(row.ProfitRate)</td>
+                                    <td class="has-text-right">@FormatNumber(row.ProfitAmount)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="pagination is-small is-centered mt-5" role="navigation" aria-label="Sayfalama">
+                    <button class="pagination-previous"
+                            type="button"
+                            disabled="@(isLoading || detail.PageNumber <= 1)"
+                            @onclick="PreviousPageAsync">
+                        Önceki
+                    </button>
+                    <button class="pagination-next"
+                            type="button"
+                            disabled="@(isLoading || detail.PageNumber >= detail.TotalPageCount)"
+                            @onclick="NextPageAsync">
+                        Sonraki
+                    </button>
+                    <ul class="pagination-list">
+                        <li>
+                            <span class="pagination-link is-current">
+                                @detail.PageNumber / @detail.TotalPageCount
+                            </span>
+                        </li>
+                        <li><span class="pagination-ellipsis">@detail.TotalRowCount.ToString("N0") satır</span></li>
+                    </ul>
+                </nav>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public long ImportId { get; set; }
+
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private readonly ReportRowType[] rowTypes = Enum.GetValues<ReportRowType>();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private ReportDetailResult? detail;
+    private ReportRowType selectedRowType = ReportRowType.CategorySummary;
+    private string searchText = string.Empty;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+
+        if (currentUser.Identity?.IsAuthenticated == true)
+        {
+            await LoadDetailAsync(1);
+        }
+    }
+
+    private async Task LoadDetailAsync(int pageNumber)
+    {
+        if (isLoading)
+        {
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            detail = await ReportImportService.GetDetailAsync(
+                ImportId,
+                selectedRowType,
+                searchText,
+                pageNumber,
+                50,
+                currentUser,
+                cancellationTokenSource.Token);
+            searchText = detail.SearchText;
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetUserMessage(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SelectRowTypeAsync(ReportRowType rowType)
+    {
+        if (selectedRowType == rowType || isLoading)
+        {
+            return;
+        }
+
+        selectedRowType = rowType;
+        await LoadDetailAsync(1);
+    }
+
+    private Task SearchAsync() => LoadDetailAsync(1);
+
+    private async Task ClearSearchAsync()
+    {
+        searchText = string.Empty;
+        await LoadDetailAsync(1);
+    }
+
+    private Task PreviousPageAsync() => detail is null ? Task.CompletedTask : LoadDetailAsync(detail.PageNumber - 1);
+    private Task NextPageAsync() => detail is null ? Task.CompletedTask : LoadDetailAsync(detail.PageNumber + 1);
+
+    private static string DisplayStore(ReportDetailRowItem row) => row.StoreNumber is null
+        ? row.StoreName ?? "–"
+        : $"{row.StoreNumber} · {row.StoreName}";
+
+    private static string DisplayCodeAndName(string? code, string? name) =>
+        string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(name)
+            ? "–"
+            : string.Join(" · ", new[] { code, name }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
+    private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value:N2}";
+
+    private static string GetUserMessage(Exception exception) => exception switch
+    {
+        ReportNotFoundException => exception.Message,
+        UnauthorizedAccessException => exception.Message,
+        _ => "Rapor detayları yüklenirken beklenmeyen bir hata oluştu."
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+}

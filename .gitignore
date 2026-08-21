@@ -28,6 +28,10 @@ appsettings.Local.json
 appsettings.*.Local.json
 secrets.json
 
+## SQLite runtime sidecar files
+*.db-shm
+*.db-wal
+
 ## OS files
 .DS_Store
 Thumbs.db

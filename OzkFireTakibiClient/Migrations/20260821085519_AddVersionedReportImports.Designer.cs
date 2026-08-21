@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OzkFireTakibiClient.Src.Data;
 
@@ -10,9 +11,11 @@ using OzkFireTakibiClient.Src.Data;
 namespace OzkFireTakibiClient.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821085519_AddVersionedReportImports")]
+    partial class AddVersionedReportImports
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -56,9 +59,6 @@ namespace OzkFireTakibiClient.Migrations
                     b.Property<int>("ProductSummaryRowCount")
                         .HasColumnType("INTEGER");
 
-                    b.Property<long>("ReportPeriodId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Scope")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -92,39 +92,11 @@ namespace OzkFireTakibiClient.Migrations
 
                     b.HasIndex("UploadedByUserId");
 
-                    b.HasIndex("ReportPeriodId", "PeriodType", "IsActive")
+                    b.HasIndex("Scope", "StartDate", "EndDate", "PeriodType", "IsActive")
                         .IsUnique()
                         .HasFilter("\"IsActive\" = 1");
 
                     b.ToTable("report_imports", (string)null);
-                });
-
-            modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportPeriodEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Scope", "EndDate")
-                        .IsUnique();
-
-                    b.ToTable("report_periods", (string)null);
                 });
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportRowEntity", b =>
@@ -335,19 +307,11 @@ namespace OzkFireTakibiClient.Migrations
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportImportEntity", b =>
                 {
-                    b.HasOne("OzkFireTakibiClient.Src.Data.Entities.ReportPeriodEntity", "ReportPeriod")
-                        .WithMany("Imports")
-                        .HasForeignKey("ReportPeriodId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("OzkFireTakibiClient.Src.Data.Entities.UserEntity", "UploadedByUser")
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("ReportPeriod");
 
                     b.Navigation("UploadedByUser");
                 });
@@ -366,11 +330,6 @@ namespace OzkFireTakibiClient.Migrations
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportImportEntity", b =>
                 {
                     b.Navigation("Rows");
-                });
-
-            modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportPeriodEntity", b =>
-                {
-                    b.Navigation("Imports");
                 });
 #pragma warning restore 612, 618
         }
