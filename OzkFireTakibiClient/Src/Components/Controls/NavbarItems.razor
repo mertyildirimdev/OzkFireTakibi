@@ -1,0 +1,47 @@
+<div class="p-4">
+    <aside class="menu">
+        <p class="menu-label">Genel</p>
+        <ul class="menu-list">
+            @foreach (var item in navItems)
+            {
+                <li class="mb-2">
+                    <NavLink href="@item.Url" Match="NavLinkMatch.All" ActiveClass="is-active" @onclick="HandleNavigate">
+                        <span class="icon-text">
+                            <span class="icon" aria-hidden="true">
+                                <i class="@item.Icon"></i>
+                            </span>
+                            <span>@item.Title</span>
+                        </span>
+                    </NavLink>
+                </li>
+            }
+        </ul>
+    </aside>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+
+    private class NavItem
+    {
+        public string Title { get; set; } = default!;
+        public string Icon { get; set; } = default!;
+        public string Url { get; set; } =  default!;
+    }
+
+    private readonly List<NavItem> navItems = new List<NavItem>
+    {
+        new NavItem { Title = "Anasayfa", Icon = "fas fa-house", Url = "" },
+        new NavItem { Title = "Raporlar", Icon = "fas fa-file-alt", Url = "/raporlar" }
+    };
+
+    private async Task HandleNavigate()
+    {
+        if (OnNavigate.HasDelegate)
+        {
+            await OnNavigate.InvokeAsync();
+        }
+    }
+}
+

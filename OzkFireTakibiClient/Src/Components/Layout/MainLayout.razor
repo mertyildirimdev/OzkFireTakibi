@@ -1,0 +1,104 @@
+@inherits LayoutComponentBase
+@inject LoginService LoginService
+
+<div class="hero is-fullheight">
+    <div class="hero-body is-align-items-stretch p-0">
+        <div class="columns is-gapless is-mobile is-flex-grow-1 mb-0">
+    <aside class="box column is-one-quarter-tablet is-one-fifth-desktop is-hidden-mobile is-radiusless p-0 mb-0" aria-label="Ana menü">
+        <NavMenu />
+    </aside>
+
+    <div class="column">
+        <nav class="navbar has-shadow" role="navigation" aria-label="Üst menü">
+            <div class="navbar-brand">
+                <NavLink class="navbar-item has-text-weight-semibold is-hidden-tablet" href="">
+                    <span class="icon-text">
+                        <span class="icon has-text-primary" aria-hidden="true">
+                            <i class="fas fa-fire-flame-curved"></i>
+                        </span>
+                        <span>ÖZK Fire</span>
+                    </span>
+                </NavLink>
+
+                <button class="navbar-burger is-hidden-tablet @(_isNavbarMenuOpen ? "is-active" : "")"
+                        type="button"
+                        aria-label="Menüyü aç veya kapat"
+                        aria-expanded="@(_isNavbarMenuOpen ? "true" : "false")"
+                        @onclick="ToggleNavbarMenu">
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                </button>
+            </div>
+
+            <div class="navbar-menu @(_isNavbarMenuOpen ? "is-active" : "")">
+                <div class="navbar-start is-hidden-tablet">
+                    <div class="navbar-item">
+                        <NavbarItems OnNavigate="CloseNavbarMenu" />
+                    </div>
+                </div>
+
+                <div class="navbar-end">
+                    <AuthorizeView>
+                        <Authorized>
+                            <div class="navbar-item">
+                                <span class="icon-text has-text-grey">
+                                    <span class="icon" aria-hidden="true">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    <span>@context.User.Identity?.Name</span>
+                                </span>
+                            </div>
+                            <div class="navbar-item">
+                                <span class="tag is-info is-light">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                            </div>
+                            <div class="navbar-item">
+                                <button class="button is-danger is-light is-small" @onclick="Logout">Çıkış Yap</button>
+                            </div>
+                        </Authorized>
+                        <NotAuthorized>
+                            <div class="navbar-item">
+                                <NavLink class="button is-primary is-light is-small" href="giris">Giriş Yap</NavLink>
+                            </div>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </nav>
+
+        <main class="section">
+            <div class="container is-fluid">
+            @Body
+            </div>
+        </main>
+    </div>
+</div>
+</div>
+</div>
+
+<div id="blazor-error-ui" class="notification is-danger is-light" data-nosnippet>
+    Bir hata oluştu.
+    <a href="." class="reload has-text-weight-semibold ml-2">Yeniden yükle</a>
+    <button class="delete dismiss" type="button" aria-label="Bildirimi kapat"></button>
+</div>
+
+@code {
+    private bool _isNavbarMenuOpen;
+
+    private void ToggleNavbarMenu()
+    {
+        _isNavbarMenuOpen = !_isNavbarMenuOpen;
+    }
+
+    private void CloseNavbarMenu()
+    {
+        _isNavbarMenuOpen = false;
+    }
+
+    private async Task Logout()
+    {
+        CloseNavbarMenu();
+        await LoginService.LogoutAsync();
+    }
+}
