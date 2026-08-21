@@ -168,18 +168,25 @@
                 <div class="level-left">
                     <h2 id="rows-title" class="title is-5 mb-0">Excel satırları</h2>
                 </div>
-                @if (detail.Header.PeriodType == ReportPeriodType.Monthly)
-                {
-                    <div class="level-right">
-                        <label class="checkbox">
-                            <input type="checkbox"
-                                   checked="@compareWithCumulative"
-                                   disabled="@(isLoading || detail.Header.ComparisonSource is null)"
-                                   @onchange="ToggleComparisonAsync" />
-                            Kümülatif raporla karşılaştır
-                        </label>
+                <div class="level-right">
+                    <div class="buttons">
+                        <button class="button is-small is-light" type="button" @onclick="OpenFieldSelector">
+                            <span class="icon"><i class="fas fa-table-columns"></i></span>
+                            <span>Gösterilecek alanlar (@SelectedFieldKeys.Count/@fields.Length)</span>
+                        </button>
+                        @if (detail.Header.PeriodType == ReportPeriodType.Monthly)
+                        {
+                            <label class="button is-small is-light">
+                                <input class="mr-2"
+                                       type="checkbox"
+                                       checked="@compareWithCumulative"
+                                       disabled="@(isLoading || detail.Header.ComparisonSource is null)"
+                                       @onchange="ToggleComparisonAsync" />
+                                Kümülatif raporla karşılaştır
+                            </label>
+                        }
                     </div>
-                }
+                </div>
             </div>
 
             @if (detail.IncludeComparison && detail.Header.ComparisonSource is not null)
@@ -246,27 +253,22 @@
                         <thead>
                             <tr>
                                 <th rowspan="2">Excel satırı</th>
-                                <th rowspan="2">Mağaza</th>
-                                <th rowspan="2">Kategori</th>
-                                <th rowspan="2">Ürün</th>
-                                <th rowspan="2">Alternatif isim</th>
-                                <th rowspan="2">Maliyet grubu</th>
                                 @if (detail.IncludeComparison)
                                 {
                                     <th rowspan="2">Eşleşme</th>
                                 }
-                                @foreach (var metric in metrics)
+                                @foreach (var field in VisibleFields)
                                 {
-                                    <th class="has-text-centered" colspan="@(detail.IncludeComparison ? 2 : 1)">@metric.Label</th>
+                                    <th class="has-text-centered" colspan="@(detail.IncludeComparison ? 2 : 1)">@field.Label</th>
                                 }
                             </tr>
                             <tr>
-                                @foreach (var metric in metrics)
+                                @foreach (var field in VisibleFields)
                                 {
-                                    <th class="has-text-right">@(detail.Header.PeriodType == ReportPeriodType.Monthly ? "Aylık" : "Kümülatif")</th>
+                                    <th class="@(field.IsNumeric ? "has-text-right" : null)">@(detail.Header.PeriodType == ReportPeriodType.Monthly ? "Aylık" : "Kümülatif")</th>
                                     @if (detail.IncludeComparison)
                                     {
-                                        <th class="has-text-right">Kümülatif</th>
+                                        <th class="@(field.IsNumeric ? "has-text-right" : null)">Kümülatif</th>
                                     }
                                 }
                             </tr>
@@ -276,11 +278,6 @@
                             {
                                 <tr>
                                     <td>@row.SourceRowNumber</td>
-                                    <td>@DisplayStore(row)</td>
-                                    <td>@DisplayCodeAndName(row.CategoryCode, row.CategoryName)</td>
-                                    <td>@DisplayCodeAndName(row.StockCode, row.StockName)</td>
-                                    <td>@(row.AlternativeName ?? "–")</td>
-                                    <td>@DisplayCodeAndName(row.CostGroupType, row.CostGroupCode)</td>
                                     @if (detail.IncludeComparison)
                                     {
                                         <td>
@@ -289,12 +286,12 @@
                                             </span>
                                         </td>
                                     }
-                                    @foreach (var metric in metrics)
+                                    @foreach (var field in VisibleFields)
                                     {
-                                        <td class="has-text-right">@FormatMetric(metric, row)</td>
+                                        <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row)</td>
                                         @if (detail.IncludeComparison)
                                         {
-                                            <td class="has-text-right">@FormatMetric(metric, row.Comparison)</td>
+                                            <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row.Comparison)</td>
                                         }
                                     }
                                 </tr>
@@ -330,37 +327,97 @@
     }
 </div>
 
+@if (isFieldSelectorOpen)
+{
+    <div class="modal is-active" role="dialog" aria-modal="true" aria-labelledby="field-selector-title">
+        <div class="modal-background" @onclick="CloseFieldSelector"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p id="field-selector-title" class="modal-card-title">Gösterilecek alanlar</p>
+                <button class="delete" type="button" aria-label="Kapat" @onclick="CloseFieldSelector"></button>
+            </header>
+            <section class="modal-card-body">
+                <p class="mb-4 has-text-grey">
+                    Tabloda görmek istediğiniz Excel alanlarını seçin. @SelectedFieldKeys.Count alan seçili.
+                </p>
+                <div class="columns is-multiline">
+                    @foreach (var field in fields)
+                    {
+                        <div class="column is-half py-2">
+                            <label class="checkbox">
+                                <input class="mr-2"
+                                       type="checkbox"
+                                       checked="@SelectedFieldKeys.Contains(field.Key)"
+                                       @onchange="eventArgs => ToggleField(field.Key, eventArgs)" />
+                                @field.Label
+                            </label>
+                        </div>
+                    }
+                </div>
+            </section>
+            <footer class="modal-card-foot is-justify-content-space-between">
+                <div class="buttons mb-0">
+                    <button class="button is-light" type="button" @onclick="ResetDefaultFields">Önemli alanlar</button>
+                    <button class="button is-light" type="button" @onclick="SelectAllFields">Tümünü seç</button>
+                </div>
+                <button class="button is-primary" type="button" @onclick="CloseFieldSelector">Uygula</button>
+            </footer>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public long ImportId { get; set; }
 
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly ReportRowType[] rowTypes = Enum.GetValues<ReportRowType>();
-    private readonly MetricColumn[] metrics =
+    private static readonly string[] importantMetricFieldKeys =
     [
-        new("Satın alma grup değer çarpanı", row => row.PurchaseGroupValueFactor),
-        new("Satın alma stok değer çarpanı", row => row.PurchaseStockValueFactor),
-        new("Dönem başı miktar", row => row.OpeningQuantity),
-        new("Dönem başı tutar", row => row.OpeningAmount),
-        new("Firma alış miktar", row => row.CompanyPurchaseQuantity),
-        new("Firma alış tutar", row => row.CompanyPurchaseAmount),
-        new("Depo sevk alış miktar", row => row.WarehouseTransferInQuantity),
-        new("Depo sevk alış tutar", row => row.WarehouseTransferInAmount),
-        new("Depo sevk satış miktar", row => row.WarehouseTransferOutQuantity),
-        new("Depo sevk satış tutar", row => row.WarehouseTransferOutAmount),
-        new("Mağaza satış miktar", row => row.StoreSalesQuantity),
-        new("Mağaza satış tutar", row => row.StoreSalesAmount),
-        new("Satış maliyeti", row => row.CostOfSales),
-        new("Fire oranı", row => row.WasteRate, IsRate: true),
-        new("Fire miktarı", row => row.WasteQuantity),
-        new("Fire tutarı", row => row.WasteAmount),
-        new("Dönem sonu miktar", row => row.ClosingQuantity),
-        new("Dönem sonu tutar", row => row.ClosingAmount),
-        new("Kâr tutarı", row => row.ProfitAmount),
-        new("Kâr oranı", row => row.ProfitRate, IsRate: true),
-        new("Kategori kâr oranı", row => row.CategoryProfitRate, IsRate: true),
-        new("Kategori fire oranı", row => row.CategoryWasteRate, IsRate: true)
+        "storeSalesAmount",
+        "costOfSales",
+        "wasteRate",
+        "wasteAmount",
+        "profitAmount",
+        "profitRate"
     ];
+    private readonly DetailField[] fields =
+    [
+        new("sourceReportId", "rpr_id", row => row.SourceReportId.ToString("N0"), IsNumeric: true),
+        new("sourceReportType", "rpr_tip", row => DisplayText(row.SourceReportType)),
+        new("storeNumber", "Depo No", row => row.StoreNumber?.ToString("N0") ?? "–", IsNumeric: true),
+        new("storeName", "Depo Adı", row => DisplayText(row.StoreName)),
+        new("categoryCode", "Kategori Kodu", row => DisplayText(row.CategoryCode)),
+        new("categoryName", "Kategori İsmi", row => DisplayText(row.CategoryName)),
+        new("stockCode", "Stok Kodu", row => DisplayText(row.StockCode)),
+        new("stockName", "Stok İsmi", row => DisplayText(row.StockName)),
+        new("alternativeName", "Alternatif İsim", row => DisplayText(row.AlternativeName)),
+        new("costGroupType", "Maliyet Grup Tipi", row => DisplayText(row.CostGroupType)),
+        new("costGroupCode", "Maliyet Grup Kodu", row => DisplayText(row.CostGroupCode)),
+        new("purchaseGroupValueFactor", "Satın Alma Grubu Değer Çarpanı", row => FormatNumber(row.PurchaseGroupValueFactor), IsNumeric: true),
+        new("purchaseStockValueFactor", "Satın Alma Stok Değer Çarpanı", row => FormatNumber(row.PurchaseStockValueFactor), IsNumeric: true),
+        new("openingQuantity", "Dönem Başı Miktar", row => FormatNumber(row.OpeningQuantity), IsNumeric: true),
+        new("openingAmount", "Dönem Başı Tutar", row => FormatNumber(row.OpeningAmount), IsNumeric: true),
+        new("companyPurchaseQuantity", "Firma Alış Miktar", row => FormatNumber(row.CompanyPurchaseQuantity), IsNumeric: true),
+        new("companyPurchaseAmount", "Firma Alış Tutar", row => FormatNumber(row.CompanyPurchaseAmount), IsNumeric: true),
+        new("warehouseTransferInQuantity", "Depo Sevk Alış Miktar", row => FormatNumber(row.WarehouseTransferInQuantity), IsNumeric: true),
+        new("warehouseTransferInAmount", "Depo Sevk Alış Tutar", row => FormatNumber(row.WarehouseTransferInAmount), IsNumeric: true),
+        new("warehouseTransferOutQuantity", "Depo Sevk Satış Miktar", row => FormatNumber(row.WarehouseTransferOutQuantity), IsNumeric: true),
+        new("warehouseTransferOutAmount", "Depo Sevk Satış Tutar", row => FormatNumber(row.WarehouseTransferOutAmount), IsNumeric: true),
+        new("storeSalesQuantity", "Mağaza Satış Miktar", row => FormatNumber(row.StoreSalesQuantity), IsNumeric: true),
+        new("storeSalesAmount", "Mağaza Satış Tutar", row => FormatNumber(row.StoreSalesAmount), IsNumeric: true),
+        new("costOfSales", "Satış Maliyeti", row => FormatNumber(row.CostOfSales), IsNumeric: true),
+        new("wasteRate", "Fire Oranı", row => FormatRate(row.WasteRate), IsNumeric: true),
+        new("wasteQuantity", "Fire Miktarı", row => FormatNumber(row.WasteQuantity), IsNumeric: true),
+        new("wasteAmount", "Fire Tutarı", row => FormatNumber(row.WasteAmount), IsNumeric: true),
+        new("closingQuantity", "Dönem Sonu Miktar", row => FormatNumber(row.ClosingQuantity), IsNumeric: true),
+        new("closingAmount", "Dönem Sonu Tutar", row => FormatNumber(row.ClosingAmount), IsNumeric: true),
+        new("profitAmount", "Kar Tutar", row => FormatNumber(row.ProfitAmount), IsNumeric: true),
+        new("profitRate", "Kar Oran", row => FormatRate(row.ProfitRate), IsNumeric: true),
+        new("categoryProfitRate", "Kategori Kar Oran", row => FormatRate(row.CategoryProfitRate), IsNumeric: true),
+        new("categoryWasteRate", "Kategori Fire Oran", row => FormatRate(row.CategoryWasteRate), IsNumeric: true)
+    ];
+    private readonly Dictionary<ReportRowType, HashSet<string>> selectedFieldKeysByRowType = [];
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private ReportDetailResult? detail;
     private ReportRowType selectedRowType = ReportRowType.CategorySummary;
@@ -368,6 +425,25 @@
     private string? errorMessage;
     private bool isLoading;
     private bool compareWithCumulative;
+    private bool isFieldSelectorOpen;
+
+    private HashSet<string> SelectedFieldKeys
+    {
+        get
+        {
+            if (selectedFieldKeysByRowType.TryGetValue(selectedRowType, out var selectedKeys))
+            {
+                return selectedKeys;
+            }
+
+            selectedKeys = new HashSet<string>(GetDefaultFieldKeys(selectedRowType), StringComparer.Ordinal);
+            selectedFieldKeysByRowType[selectedRowType] = selectedKeys;
+            return selectedKeys;
+        }
+    }
+
+    private IEnumerable<DetailField> VisibleFields =>
+        fields.Where(column => SelectedFieldKeys.Contains(column.Key));
 
     protected override async Task OnInitializedAsync()
     {
@@ -447,25 +523,95 @@
         await LoadDetailAsync(1);
     }
 
+    private void OpenFieldSelector() => isFieldSelectorOpen = true;
+    private void CloseFieldSelector() => isFieldSelectorOpen = false;
+
+    private void ToggleField(string fieldKey, ChangeEventArgs eventArgs)
+    {
+        if (eventArgs.Value is bool isChecked && isChecked)
+        {
+            SelectedFieldKeys.Add(fieldKey);
+            return;
+        }
+
+        SelectedFieldKeys.Remove(fieldKey);
+    }
+
+    private void SelectAllFields()
+    {
+        foreach (var field in fields)
+        {
+            SelectedFieldKeys.Add(field.Key);
+        }
+    }
+
+    private void ResetDefaultFields()
+    {
+        SelectedFieldKeys.Clear();
+
+        foreach (var fieldKey in GetDefaultFieldKeys(selectedRowType))
+        {
+            SelectedFieldKeys.Add(fieldKey);
+        }
+    }
+
     private Task PreviousPageAsync() => detail is null ? Task.CompletedTask : LoadDetailAsync(detail.PageNumber - 1);
     private Task NextPageAsync() => detail is null ? Task.CompletedTask : LoadDetailAsync(detail.PageNumber + 1);
 
-    private static string DisplayStore(ReportDetailRowItem row) => row.StoreNumber is null
-        ? row.StoreName ?? "–"
-        : $"{row.StoreNumber} · {row.StoreName}";
-
-    private static string DisplayCodeAndName(string? code, string? name) =>
-        string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(name)
-            ? "–"
-            : string.Join(" · ", new[] { code, name }.Where(value => !string.IsNullOrWhiteSpace(value)));
-
+    private static string DisplayText(string? value) => string.IsNullOrWhiteSpace(value) ? "–" : value;
     private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
     private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value:N2}";
-    private static string FormatMetric(MetricColumn metric, ReportDetailRowItem? row) => row is null
-        ? "–"
-        : metric.IsRate
-            ? FormatRate(metric.GetValue(row))
-            : FormatNumber(metric.GetValue(row));
+    private string FormatField(DetailField field, ReportDetailRowItem? row)
+    {
+        if (row is null)
+        {
+            return "–";
+        }
+
+        return IsRollupField(selectedRowType, field.Key) ? "Tümü" : field.GetValue(row);
+    }
+
+    private static string[] GetDefaultFieldKeys(ReportRowType rowType) => rowType switch
+    {
+        ReportRowType.General => [.. importantMetricFieldKeys],
+        ReportRowType.CategorySummary => ["categoryCode", "categoryName", .. importantMetricFieldKeys],
+        ReportRowType.StoreSummary => ["storeNumber", "storeName", .. importantMetricFieldKeys],
+        ReportRowType.StoreCategory =>
+        [
+            "storeNumber", "storeName", "categoryCode", "categoryName", .. importantMetricFieldKeys
+        ],
+        ReportRowType.ProductSummary => ["stockCode", "stockName", .. importantMetricFieldKeys],
+        ReportRowType.StoreProduct =>
+        [
+            "storeNumber", "storeName", "categoryCode", "categoryName", "stockCode", "stockName",
+            .. importantMetricFieldKeys
+        ],
+        _ => [.. importantMetricFieldKeys]
+    };
+
+    private static bool IsRollupField(ReportRowType rowType, string fieldKey) => rowType switch
+    {
+        ReportRowType.General =>
+            IsStoreField(fieldKey) || IsCategoryField(fieldKey) || IsStockField(fieldKey) ||
+            IsAlternativeNameField(fieldKey) || IsCostGroupField(fieldKey),
+        ReportRowType.CategorySummary =>
+            IsStoreField(fieldKey) || IsStockField(fieldKey) || IsAlternativeNameField(fieldKey) ||
+            IsCostGroupField(fieldKey),
+        ReportRowType.StoreSummary =>
+            IsCategoryField(fieldKey) || IsStockField(fieldKey) || IsAlternativeNameField(fieldKey) ||
+            IsCostGroupField(fieldKey),
+        ReportRowType.StoreCategory =>
+            IsStockField(fieldKey) || IsAlternativeNameField(fieldKey) || IsCostGroupField(fieldKey),
+        ReportRowType.ProductSummary =>
+            IsStoreField(fieldKey) || IsCategoryField(fieldKey) || IsCostGroupField(fieldKey),
+        _ => false
+    };
+
+    private static bool IsStoreField(string fieldKey) => fieldKey is "storeNumber" or "storeName";
+    private static bool IsCategoryField(string fieldKey) => fieldKey is "categoryCode" or "categoryName";
+    private static bool IsStockField(string fieldKey) => fieldKey is "stockCode" or "stockName";
+    private static bool IsAlternativeNameField(string fieldKey) => fieldKey == "alternativeName";
+    private static bool IsCostGroupField(string fieldKey) => fieldKey is "costGroupType" or "costGroupCode";
 
     private static string GetUserMessage(Exception exception) => exception switch
     {
@@ -482,8 +628,9 @@
         return ValueTask.CompletedTask;
     }
 
-    private sealed record MetricColumn(
+    private sealed record DetailField(
+        string Key,
         string Label,
-        Func<ReportDetailRowItem, decimal?> GetValue,
-        bool IsRate = false);
+        Func<ReportDetailRowItem, string> GetValue,
+        bool IsNumeric = false);
 }

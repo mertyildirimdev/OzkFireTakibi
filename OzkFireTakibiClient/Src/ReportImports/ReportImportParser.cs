@@ -166,6 +166,7 @@ public sealed partial class ReportImportParser
             {
                 SourceRowNumber = sourceRowNumber,
                 RowType = rowType,
+                SourceReportId = reportId,
                 SourceReportType = reportType,
                 StoreNumber = NormalizeStoreNumber(GetNullableInt(reader, headers, "Depo No", sourceRowNumber)),
                 StoreName = NullIfRollup(GetText(reader, headers, "Depo Adı")),

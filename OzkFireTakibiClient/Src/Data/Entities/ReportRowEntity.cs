@@ -5,6 +5,7 @@ public class ReportRowEntity : BaseEntity<long>
     public long ReportImportId { get; set; }
     public int SourceRowNumber { get; set; }
     public ReportRowType RowType { get; set; }
+    public int SourceReportId { get; set; }
     public string SourceReportType { get; set; } = default!;
     public int? StoreNumber { get; set; }
     public string? StoreName { get; set; }

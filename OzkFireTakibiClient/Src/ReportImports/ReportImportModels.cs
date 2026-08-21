@@ -18,6 +18,7 @@ public sealed class ParsedReportRow
 {
     public required int SourceRowNumber { get; init; }
     public required ReportRowType RowType { get; init; }
+    public required int SourceReportId { get; init; }
     public required string SourceReportType { get; init; }
     public int? StoreNumber { get; init; }
     public string? StoreName { get; init; }
@@ -182,6 +183,7 @@ public sealed class ReportDetailRowItem
 {
     public required long Id { get; init; }
     public required int SourceRowNumber { get; init; }
+    public required int SourceReportId { get; init; }
     public required string SourceReportType { get; init; }
     public int? StoreNumber { get; init; }
     public string? StoreName { get; init; }

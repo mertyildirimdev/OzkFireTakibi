@@ -721,6 +721,7 @@ public sealed class ReportImportService(
     {
         Id = row.Id,
         SourceRowNumber = row.SourceRowNumber,
+        SourceReportId = row.SourceReportId,
         SourceReportType = row.SourceReportType,
         StoreNumber = row.StoreNumber,
         StoreName = row.StoreName,
@@ -784,6 +785,7 @@ public sealed class ReportImportService(
             ReportImportId = reportImportId,
             SourceRowNumber = row.SourceRowNumber,
             RowType = row.RowType,
+            SourceReportId = row.SourceReportId,
             SourceReportType = row.SourceReportType,
             StoreNumber = row.StoreNumber,
             StoreName = row.StoreName,
