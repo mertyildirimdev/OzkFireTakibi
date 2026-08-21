@@ -1,3 +1,12 @@
+@*
+    Rapor Detay ve Analiz Sayfası (RaporDetay.razor)
+    - Rapor genel metrikleri ve özet kartları (ciro, maliyet, fire oranı, kâr oranı)
+    - Satır kırılım sekmeleri (Genel, Kategori Özeti, Mağaza Özeti, Mağaza x Kategori, Ürün Özeti, Mağaza x Ürün)
+    - Sütun/alan seçici modal (gösterilecek Excel alanlarını özelleştirme)
+    - Canlı metin arama ve sunucu taraflı sayfalama
+    - Kümülatif rapor ile yan yana karşılaştırma modu
+*@
+
 @page "/raporlar/{ImportId:long}"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -5,6 +14,7 @@
 @using OzkFireTakibiClient.Src.Data.Entities
 
 <PageTitle>Rapor Detayı</PageTitle>
+
 
 <div class="container">
     <div class="mb-5">

@@ -8,10 +8,20 @@ using OzkFireTakibiClient.Src.Data.Entities;
 
 namespace OzkFireTakibiClient.Src.ReportImports;
 
+/// <summary>
+/// Şarküteri ve Kuruyemiş/Kuru Meyve yangın/fire takip Excel raporlarını (.xls, .xlsx) ayrıştıran,
+/// doğrulayan ve yapılandırılmış veri modellerine dönüştüren ayrıştırıcı servis.
+/// </summary>
 public sealed partial class ReportImportParser
 {
+    /// <summary>
+    /// Excel çalışma kitabında okunacak sayfa adı ("İCMAL")
+    /// </summary>
     private const string SheetName = "İCMAL";
 
+    /// <summary>
+    /// Excel dosyasında bulunması zorunlu olan 33 adet kolon başlığı
+    /// </summary>
     private static readonly string[] RequiredHeaders =
     [
         "rpr_id", "rpr_tip", "Depo No", "Depo Adı", "Kategori Kodu", "Kategori İsmi",
@@ -24,6 +34,13 @@ public sealed partial class ReportImportParser
         "Kar Oran", "Kategori Kar Oran", "Kategori Fire Oran"
     ];
 
+    /// <summary>
+    /// Verilen Excel dosyasını asenkron olarak okur, doğrular ve ParsedReport nesnesine dönüştürür.
+    /// </summary>
+    /// <param name="filePath">Geçici dosya yolu</param>
+    /// <param name="originalFileName">Kullanıcının yüklediği orijinal dosya adı</param>
+    /// <param name="cancellationToken">İptal belirteci</param>
+    /// <returns>Ayrıştırılmış ve doğrulanmış rapor modeli</returns>
     public async Task<ParsedReport> ParseAsync(
         string filePath,
         string originalFileName,
@@ -40,24 +57,30 @@ public sealed partial class ReportImportParser
             bufferSize: 81920,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
 
+        // Dosya mükerrerliğini önlemek için SHA256 karma özeti hesapla
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken)).ToLowerInvariant();
         stream.Position = 0;
 
         try
         {
+            // Windows-1254 Türkçe kod sayfası desteğiyle Excel okuyucusu oluştur
             using var reader = ExcelReaderFactory.CreateReader(stream, new ExcelReaderConfiguration
             {
                 FallbackEncoding = Encoding.GetEncoding(1254),
                 LeaveOpen = true
             });
 
+            // "İCMAL" sayfasına geç, başlıkları ve satırları oku
             MoveToReportSheet(reader);
             var headers = ReadHeaders(reader);
             var rows = ReadRows(reader, headers, cancellationToken);
+
+            // Satır sırasını, ürün kodlarını ve tekillik anahtarlarını doğrula
             ValidateRowOrder(rows);
             ResolveProductCodes(rows);
             ValidateNaturalKeys(rows);
 
+            // Tarih aralığını ve dönem tipini (Aylık vs Kümülatif) belirle
             var (startDate, endDate) = ResolvePeriod(rows);
             var periodType = endDate.DayNumber - startDate.DayNumber <= 31
                 ? ReportPeriodType.Monthly
@@ -84,6 +107,7 @@ public sealed partial class ReportImportParser
                 exception);
         }
     }
+
 
     private static void ValidateExtension(string originalFileName)
     {
@@ -210,6 +234,9 @@ public sealed partial class ReportImportParser
         return rows;
     }
 
+    /// <summary>
+    /// Excel satırındaki rpr_id ve rpr_tip alanlarına göre satırın hiyerarşik türünü (ReportRowType) belirler.
+    /// </summary>
     private static ReportRowType ResolveRowType(int reportId, string reportType, int sourceRowNumber)
     {
         var expectedText = reportId switch
@@ -250,6 +277,9 @@ public sealed partial class ReportImportParser
         };
     }
 
+    /// <summary>
+    /// Rapordaki satır bloklarının beklenen sıraya (Genel -> Kategori -> Mağaza -> Mağaza-Kategori -> Ürün -> Mağaza-Ürün) uygunluğunu doğrular.
+    /// </summary>
     private static void ValidateRowOrder(IReadOnlyList<ParsedReportRow> rows)
     {
         var expectedOrder = new[]
@@ -293,6 +323,9 @@ public sealed partial class ReportImportParser
         }
     }
 
+    /// <summary>
+    /// Excel'de ürün özet satırlarında (rpr_id=5) eksik olabilen stok kodlarını, mağaza-ürün detay satırları (rpr_id=7) üzerinden eşleştirerek tamamlar.
+    /// </summary>
     private static void ResolveProductCodes(IReadOnlyList<ParsedReportRow> rows)
     {
         var detailRows = rows.Where(row => row.RowType == ReportRowType.StoreProduct).ToArray();
@@ -347,6 +380,9 @@ public sealed partial class ReportImportParser
         }
     }
 
+    /// <summary>
+    /// Her satır türü için doğal iş anahtarlarının (kategori kodu, mağaza no, ürün kodu) tekilliğini doğrular.
+    /// </summary>
     private static void ValidateNaturalKeys(IReadOnlyList<ParsedReportRow> rows)
     {
         EnsureUnique(rows, ReportRowType.CategorySummary, row => RequireKey(row.CategoryCode, "Kategori Kodu", row.SourceRowNumber));
@@ -373,6 +409,9 @@ public sealed partial class ReportImportParser
         }
     }
 
+    /// <summary>
+    /// Genel durum satırındaki metinden (örn: "Genel Durum 01.08.2026-31.08.2026") başlangıç ve bitiş tarihlerini çıkarır.
+    /// </summary>
     private static (DateOnly StartDate, DateOnly EndDate) ResolvePeriod(IReadOnlyList<ParsedReportRow> rows)
     {
         var generalRow = rows.Single(row => row.RowType == ReportRowType.General);
@@ -389,6 +428,9 @@ public sealed partial class ReportImportParser
         return (startDate, endDate);
     }
 
+    /// <summary>
+    /// Kategori kodlarının ön ekine göre rapor kapsamını belirler (12.x -> Şarküteri, 15.x -> Kuruyemiş/Kuru Meyve).
+    /// </summary>
     private static ReportScope ResolveScope(IReadOnlyList<ParsedReportRow> rows)
     {
         var categoryCodes = rows

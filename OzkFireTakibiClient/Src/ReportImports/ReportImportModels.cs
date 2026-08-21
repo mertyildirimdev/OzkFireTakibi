@@ -2,18 +2,50 @@ using OzkFireTakibiClient.Src.Data.Entities;
 
 namespace OzkFireTakibiClient.Src.ReportImports;
 
+/// <summary>
+/// Excel dosyasından başarıyla ayrıştırılmış ham rapor verisini ve metaverilerini temsil eder.
+/// </summary>
 public sealed class ParsedReport
 {
+    /// <summary>
+    /// Dosya içeriğinin SHA256 karma özeti
+    /// </summary>
     public required string FileHash { get; init; }
+
+    /// <summary>
+    /// Raporun ürün grubu kapsamı (Şarküteri veya Kuruyemiş)
+    /// </summary>
     public required ReportScope Scope { get; init; }
+
+    /// <summary>
+    /// Raporun dönem tipi (Aylık kesinleşen veya Kümülatif)
+    /// </summary>
     public required ReportPeriodType PeriodType { get; init; }
+
+    /// <summary>
+    /// Raporun başlangıç tarihi
+    /// </summary>
     public required DateOnly StartDate { get; init; }
+
+    /// <summary>
+    /// Raporun bitiş tarihi
+    /// </summary>
     public required DateOnly EndDate { get; init; }
+
+    /// <summary>
+    /// Ayrıştırılan satırların listesi
+    /// </summary>
     public required IReadOnlyList<ParsedReportRow> Rows { get; init; }
 
+    /// <summary>
+    /// Belirtilen satır türüne (ReportRowType) ait satır sayısını döndürür.
+    /// </summary>
     public int Count(ReportRowType rowType) => Rows.Count(x => x.RowType == rowType);
 }
 
+/// <summary>
+/// Excel dosyasından ayrıştırılmış tek bir veri satırını temsil eder.
+/// </summary>
 public sealed class ParsedReportRow
 {
     public required int SourceRowNumber { get; init; }
@@ -53,6 +85,9 @@ public sealed class ParsedReportRow
     public decimal? CategoryWasteRate { get; init; }
 }
 
+/// <summary>
+/// Yükleme öncesinde aylık ve kümülatif rapor çiftinin doğrulama ve önizleme özetini içerir.
+/// </summary>
 public sealed class ReportPairImportPreview
 {
     public required ReportScope Scope { get; init; }
@@ -60,9 +95,16 @@ public sealed class ReportPairImportPreview
     public required ReportPairFilePreview MonthlyReport { get; init; }
     public required ReportPairFilePreview CumulativeReport { get; init; }
 
+    /// <summary>
+    /// Dosyalardan en az birinin yeni veya güncellenmiş sürüm olup olmadığını belirtir.
+    /// </summary>
     public bool HasChanges => !MonthlyReport.IsAlreadyActive || !CumulativeReport.IsAlreadyActive;
 }
 
+
+/// <summary>
+/// Çift rapor yüklemesinde tek bir dosyanın (aylık veya kümülatif) önizleme bilgilerini içerir.
+/// </summary>
 public sealed class ReportPairFilePreview
 {
     public required string OriginalFileName { get; init; }
@@ -80,6 +122,9 @@ public sealed class ReportPairFilePreview
     public required bool ReplacesActiveVersion { get; init; }
 }
 
+/// <summary>
+/// Rapor geçmişi listesinde tek bir rapor içe aktarım kaydını temsil eden DTO.
+/// </summary>
 public sealed class ReportImportHistoryItem
 {
     public required long Id { get; init; }
@@ -95,6 +140,9 @@ public sealed class ReportImportHistoryItem
     public required DateTime ImportedAtUtc { get; init; }
 }
 
+/// <summary>
+/// Bağlı rapor dönemleri listesinde bir dönemin aylık ve kümülatif rapor durumunu temsil eden DTO.
+/// </summary>
 public sealed class ReportPeriodOverviewItem
 {
     public required long Id { get; init; }
@@ -103,9 +151,15 @@ public sealed class ReportPeriodOverviewItem
     public ReportPeriodFileItem? MonthlyReport { get; init; }
     public ReportPeriodFileItem? CumulativeReport { get; init; }
 
+    /// <summary>
+    /// Hem aylık hem de kümülatif raporun eksiksiz yüklü olup olmadığını belirtir.
+    /// </summary>
     public bool IsComplete => MonthlyReport is not null && CumulativeReport is not null;
 }
 
+/// <summary>
+/// Dönem genel bakışındaki dosya bilgisi.
+/// </summary>
 public sealed class ReportPeriodFileItem
 {
     public required long ImportId { get; init; }
@@ -114,6 +168,9 @@ public sealed class ReportPeriodFileItem
     public required DateOnly EndDate { get; init; }
 }
 
+/// <summary>
+/// Aylık ve kümülatif rapor çifti yükleme işleminin veritabanı kayıt sonucunu temsil eder.
+/// </summary>
 public sealed class ReportPairImportResult
 {
     public required long ReportPeriodId { get; init; }
@@ -123,6 +180,9 @@ public sealed class ReportPairImportResult
     public required bool CumulativeReportChanged { get; init; }
 }
 
+/// <summary>
+/// Rapor detay sayfası için sorgulanan başlık, sayfalama ve satır verilerini içerir.
+/// </summary>
 public sealed class ReportDetailResult
 {
     public required ReportDetailHeader Header { get; init; }
@@ -134,9 +194,15 @@ public sealed class ReportDetailResult
     public required IReadOnlyList<ReportDetailRowItem> Rows { get; init; }
     public required bool IncludeComparison { get; init; }
 
+    /// <summary>
+    /// Toplam sayfa sayısı
+    /// </summary>
     public int TotalPageCount => Math.Max(1, (int)Math.Ceiling(TotalRowCount / (double)PageSize));
 }
 
+/// <summary>
+/// Rapor detay görünümünün üst bilgi ve özet kartı verilerini içerir.
+/// </summary>
 public sealed class ReportDetailHeader
 {
     public required long Id { get; init; }
@@ -159,6 +225,9 @@ public sealed class ReportDetailHeader
     public ReportDetailRowItem? GeneralSummary { get; init; }
     public ReportComparisonSource? ComparisonSource { get; init; }
 
+    /// <summary>
+    /// Belirtilen satır hiyerarşisi türündeki satır sayısını döndürür.
+    /// </summary>
     public int Count(ReportRowType rowType) => rowType switch
     {
         ReportRowType.General => GeneralRowCount,
@@ -171,6 +240,9 @@ public sealed class ReportDetailHeader
     };
 }
 
+/// <summary>
+/// Aylık rapor ile karşılaştırılan aktif kümülatif raporun kaynak bilgilerini içerir.
+/// </summary>
 public sealed class ReportComparisonSource
 {
     public required long ImportId { get; init; }
@@ -179,6 +251,9 @@ public sealed class ReportComparisonSource
     public required DateOnly EndDate { get; init; }
 }
 
+/// <summary>
+/// Rapor detay tablosunda gösterilen tekil satır verisi ve varsa kümülatif eşleşme verisi.
+/// </summary>
 public sealed class ReportDetailRowItem
 {
     public required long Id { get; init; }
@@ -216,9 +291,16 @@ public sealed class ReportDetailRowItem
     public decimal? ProfitRate { get; init; }
     public decimal? CategoryProfitRate { get; init; }
     public decimal? CategoryWasteRate { get; init; }
+
+    /// <summary>
+    /// Kümülatif rapordaki eşleşen karşılaştırma satırı (varsa)
+    /// </summary>
     public ReportDetailRowItem? Comparison { get; init; }
 }
 
+/// <summary>
+/// Rapor silme işleminin sonucunu temsil eder.
+/// </summary>
 public sealed class ReportDeleteResult
 {
     public required bool DeletedActiveVersion { get; init; }
@@ -226,6 +308,9 @@ public sealed class ReportDeleteResult
     public required bool DeletedEmptyReportPeriod { get; init; }
 }
 
+/// <summary>
+/// Rapor doğrulama ve biçim hatalarında fırlatılan özel istisna sınıfı.
+/// </summary>
 public sealed class ReportImportValidationException : Exception
 {
     public ReportImportValidationException(string message) : base(message)
@@ -237,6 +322,9 @@ public sealed class ReportImportValidationException : Exception
     }
 }
 
+/// <summary>
+/// İstenen rapor kimliği veritabanında bulunamadığında fırlatılan istisna sınıfı.
+/// </summary>
 public sealed class ReportNotFoundException : Exception
 {
     public ReportNotFoundException(long reportImportId)
@@ -245,8 +333,14 @@ public sealed class ReportNotFoundException : Exception
     }
 }
 
+/// <summary>
+/// Enum ve değerler için kullanıcı arayüzünde gösterilecek Türkçe metin yardımcı metotları.
+/// </summary>
 public static class ReportDisplayNames
 {
+    /// <summary>
+    /// Rapor kapsamını Türkçe metne çevirir ("Şarküteri", "Kuruyemiş ve Kuru Meyve").
+    /// </summary>
     public static string Scope(ReportScope scope) => scope switch
     {
         ReportScope.Delicatessen => "Şarküteri",
@@ -254,6 +348,9 @@ public static class ReportDisplayNames
         _ => scope.ToString()
     };
 
+    /// <summary>
+    /// Rapor dönem tipini Türkçe metne çevirir ("Aylık kesinleşen", "Kümülatif karşılaştırma").
+    /// </summary>
     public static string PeriodType(ReportPeriodType periodType) => periodType switch
     {
         ReportPeriodType.Monthly => "Aylık kesinleşen",
@@ -261,6 +358,9 @@ public static class ReportDisplayNames
         _ => periodType.ToString()
     };
 
+    /// <summary>
+    /// Verilen dönem tipinin zıt karşılığını (Monthly -> Cumulative, Cumulative -> Monthly) Türkçe metin olarak döndürür.
+    /// </summary>
     public static string Counterpart(ReportPeriodType periodType) => PeriodType(periodType switch
     {
         ReportPeriodType.Monthly => ReportPeriodType.Cumulative,
@@ -268,6 +368,9 @@ public static class ReportDisplayNames
         _ => throw new ArgumentOutOfRangeException(nameof(periodType), periodType, null)
     });
 
+    /// <summary>
+    /// Rapor satır hiyerarşi türünü Türkçe metne çevirir ("Genel", "Kategori özeti", "Mağaza özeti" vb.).
+    /// </summary>
     public static string RowType(ReportRowType rowType) => rowType switch
     {
         ReportRowType.General => "Genel",
@@ -279,3 +382,4 @@ public static class ReportDisplayNames
         _ => rowType.ToString()
     };
 }
+

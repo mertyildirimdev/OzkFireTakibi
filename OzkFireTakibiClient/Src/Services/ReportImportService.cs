@@ -11,6 +11,10 @@ using OzkFireTakibiClient.Src.ReportImports;
 
 namespace OzkFireTakibiClient.Src.Services;
 
+/// <summary>
+/// Yangın/fire takip raporlarının çiftli (aylık kesinleşen ve kümülatif karşılaştırma) içe aktarımı,
+/// doğrulanması, sürümlendirilmesi, silinmesi ve detaylı sorgulanmasını yöneten temel iş mantığı servisi.
+/// </summary>
 public sealed class ReportImportService(
     IDbContextFactory<AppDbContext> dbContextFactory,
     ReportImportParser parser,
@@ -19,6 +23,16 @@ public sealed class ReportImportService(
 {
     private readonly ReportImportOptions _options = options.Value;
 
+    /// <summary>
+    /// Aylık ve kümülatif Excel dosyalarını ayrıştırarak veritabanına kaydetmeden önce önizleme ve sürüm durumunu hazırlar.
+    /// </summary>
+    /// <param name="monthlyFilePath">Aylık kesinleşen Excel dosyasının geçici yolu</param>
+    /// <param name="monthlyOriginalFileName">Aylık dosyanın orijinal adı</param>
+    /// <param name="cumulativeFilePath">Kümülatif karşılaştırma Excel dosyasının geçici yolu</param>
+    /// <param name="cumulativeOriginalFileName">Kümülatif dosyanın orijinal adı</param>
+    /// <param name="user">İşlemi yapan kullanıcı kimliği</param>
+    /// <param name="cancellationToken">İptal belirteci</param>
+    /// <returns>Önizleme ve doğrulama sonuç modeli</returns>
     public async Task<ReportPairImportPreview> PreviewPairAsync(
         string monthlyFilePath,
         string monthlyOriginalFileName,
@@ -79,6 +93,11 @@ public sealed class ReportImportService(
         };
     }
 
+    /// <summary>
+    /// Aylık ve kümülatif Excel dosyalarını tek bir atomik veritabanı işlemi (Transaction) içinde sisteme kaydeder.
+    /// Eski aktif sürümleri pasifleştirir ve yeni satır verilerini ekler.
+    /// </summary>
+    /// <returns>İçe aktarma işlem sonucu (kaydedilen ID'ler ve değişiklik bayrakları)</returns>
     public async Task<ReportPairImportResult> ImportPairAsync(
         string monthlyFilePath,
         string monthlyOriginalFileName,
@@ -154,6 +173,9 @@ public sealed class ReportImportService(
         };
     }
 
+    /// <summary>
+    /// En son yüklenen raporların geçmiş listesini (HistoryPageSize kadar) döndürür.
+    /// </summary>
     public async Task<IReadOnlyList<ReportImportHistoryItem>> GetHistoryAsync(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
@@ -162,6 +184,7 @@ public sealed class ReportImportService(
         {
             throw new UnauthorizedAccessException("Rapor geçmişini görüntülemek için oturum açılmalıdır.");
         }
+
 
         var historyPageSize = Math.Clamp(_options.HistoryPageSize, 1, 200);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -187,6 +210,9 @@ public sealed class ReportImportService(
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Tanımlı rapor dönemlerini ve her döneme ait aktif aylık/kümülatif raporların durumunu getirir.
+    /// </summary>
     public async Task<IReadOnlyList<ReportPeriodOverviewItem>> GetReportPeriodsAsync(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
@@ -217,6 +243,9 @@ public sealed class ReportImportService(
         }).ToArray();
     }
 
+    /// <summary>
+    /// Belirtilen raporun detay bilgilerini, satır tipi filtrelemesini, arama kriterlerini, sayfalama ve kümülatif karşılaştırma verilerini sorgular.
+    /// </summary>
     public async Task<ReportDetailResult> GetDetailAsync(
         long reportImportId,
         ReportRowType rowType,
@@ -357,6 +386,11 @@ public sealed class ReportImportService(
         };
     }
 
+    /// <summary>
+    /// Raporu ve tüm detay satırlarını güvenli şekilde siler.
+    /// Silinen rapor aktif bir sürüm ise önceki en güncel sürümü otomatik olarak yeniden aktif eder.
+    /// Dönemde başka rapor kalmazsa dönemi de temizler.
+    /// </summary>
     public async Task<ReportDeleteResult> DeleteAsync(
         long reportImportId,
         ClaimsPrincipal user,

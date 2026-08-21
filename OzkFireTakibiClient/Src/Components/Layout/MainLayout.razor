@@ -1,3 +1,8 @@
+@*
+    Ana Sayfa Düzeni Bileşeni (MainLayout.razor)
+    Kenar menüsü, üst çubuk (kullanıcı bilgileri, rol etiketi ve çıkış butonu) ile ana içerik alanını birleştirir.
+*@
+
 @inherits LayoutComponentBase
 @inject LoginService LoginService
 
@@ -96,9 +101,13 @@
         _isNavbarMenuOpen = false;
     }
 
+    /// <summary>
+    /// Kullanıcı oturumunu kapatır ve login sayfasına yönlendirir.
+    /// </summary>
     private async Task Logout()
     {
         CloseNavbarMenu();
         await LoginService.LogoutAsync();
     }
 }
+

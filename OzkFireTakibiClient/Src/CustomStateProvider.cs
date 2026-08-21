@@ -7,6 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using OzkFireTakibiClient.Src.Data.Entities;
 using OzkFireTakibiClient.Src.Services;
 
+/// <summary>
+/// Blazor uygulaması için özel kimlik doğrulama durum sağlayıcısı (AuthenticationStateProvider).
+/// Tarayıcı yerel depolaması (ProtectedLocalStorage) üzerinden oturum kalıcılığı ve ClaimsPrincipal yönetimini sağlar.
+/// </summary>
 public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IServiceProvider serviceProvider) : AuthenticationStateProvider
 {
     private const string StorageKey = "auth_session";
@@ -15,8 +19,15 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
     private UserEntity? _currentUser;
     private bool _hasAttemptedRestore;
 
+    /// <summary>
+    /// Geçerli oturum açmış kullanıcı bilgisi (oturum yoksa null)
+    /// </summary>
     public UserEntity? CurrentUser => _currentUser;
 
+    /// <summary>
+    /// Mevcut kimlik doğrulama durumunu (AuthenticationState) döndürür.
+    /// Kullanıcı henüz yüklenmemişse yerel depolamadaki oturumu geri yüklemeyi dener.
+    /// </summary>
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         if (_currentUser == null && !_hasAttemptedRestore)
@@ -32,6 +43,11 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         return new AuthenticationState(user);
     }
 
+    /// <summary>
+    /// Kullanıcıyı başarılı giriş sonrası oturum açmış olarak işaretler ve durumu tüm bileşenlere bildirir.
+    /// </summary>
+    /// <param name="user">Giriş yapan kullanıcı varlığı</param>
+    /// <param name="rememberMe">Oturumun yerel depolamada saklanıp saklanmayacağı</param>
     public async Task MarkUserAsAuthenticatedAsync(UserEntity user, bool rememberMe)
     {
         _currentUser = user;
@@ -65,9 +81,13 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         var identity = CreateIdentity(user);
         var principal = new ClaimsPrincipal(identity);
 
+        // Kimlik doğrulama durumunun değiştiğini Blazor altyapısına bildir
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
     }
 
+    /// <summary>
+    /// Kullanıcı oturumunu kapatır, yerel depolamadaki oturumu siler ve durumu günceller.
+    /// </summary>
     public async Task MarkUserAsLoggedOutAsync()
     {
         _currentUser = null;
@@ -83,6 +103,9 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymousUser)));
     }
 
+    /// <summary>
+    /// Tarayıcı yerel depolamasında (localStorage) kayıtlı geçerli bir oturum olup olmadığını kontrol eder ve oturumu geri yükler.
+    /// </summary>
     private async Task TryRestoreSessionAsync()
     {
         try
@@ -104,6 +127,7 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
                     }
                 }
 
+                // Süresi dolmuş veya geçersiz kullanıcı ise depolamadan temizle
                 await _protectedLocalStorage.DeleteAsync(StorageKey);
             }
 
@@ -111,7 +135,7 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         }
         catch (InvalidOperationException)
         {
-            // Prerendering aşamasında JSInterop çağrılamaz.
+            // Prerendering aşamasında JSInterop çağrılamaz, bu durum normaldir.
         }
         catch
         {
@@ -124,6 +148,9 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         }
     }
 
+    /// <summary>
+    /// Kullanıcı varlığından ClaimsIdentity nesnesi oluşturur (Id, Name, Email, Role, StoreName talepleri eklenir).
+    /// </summary>
     private static ClaimsIdentity CreateIdentity(UserEntity user)
     {
         var claims = new List<Claim>
@@ -142,3 +169,4 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         return new ClaimsIdentity(claims, "CustomAuth");
     }
 }
+

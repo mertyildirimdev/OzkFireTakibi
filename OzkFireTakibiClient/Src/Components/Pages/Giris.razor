@@ -1,3 +1,8 @@
+@*
+    Giriş Sayfası Bileşeni (Giris.razor)
+    Kullanıcı e-posta/şifre girişi, beni hatırla seçeneği ve form doğrulamasını yönetir.
+*@
+
 @page "/giris"
 @layout EmptyLayout
 
@@ -95,6 +100,9 @@
         loginModel ??= new();
     }
 
+    /// <summary>
+    /// Form geçerli olduğunda kullanıcı kimlik doğrulama sürecini başlatır.
+    /// </summary>
     private async Task HandleValidSubmit()
     {
 
@@ -119,6 +127,9 @@
         }
     }
 
+    /// <summary>
+    /// Giriş formu veri modeli ve DataAnnotations doğrulama kuralları
+    /// </summary>
     public class LoginModel
     {
         [Required(ErrorMessage = "E-posta adresi gereklidir.")]

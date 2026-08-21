@@ -3,17 +3,40 @@ using OzkFireTakibiClient.Src.Data.Entities;
 
 namespace OzkFireTakibiClient.Src.Data;
 
+/// <summary>
+/// Uygulamanın Entity Framework Core veritabanı bağlamı (DbContext).
+/// SQLite veritabanı şeması, tablo/kolon eşlemeleri, indeksler ve ilişkileri yapılandırır.
+/// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Kullanıcı tablosu
+    /// </summary>
     public DbSet<UserEntity> Users { get; set; } = default!;
+
+    /// <summary>
+    /// Rapor dönemleri tablosu
+    /// </summary>
     public DbSet<ReportPeriodEntity> ReportPeriods { get; set; } = default!;
+
+    /// <summary>
+    /// Yüklenen raporların metaveri tablosu
+    /// </summary>
     public DbSet<ReportImportEntity> ReportImports { get; set; } = default!;
+
+    /// <summary>
+    /// Rapor satırları ve metrik verileri tablosu
+    /// </summary>
     public DbSet<ReportRowEntity> ReportRows { get; set; } = default!;
 
+    /// <summary>
+    /// Model ve şema yapılandırması
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Raporlama tablolarını, indeksleri ve kolon eşlemelerini yapılandır
         ConfigureReportImports(modelBuilder);
 
         // Mevcut migration ve SQLite şemasıyla uyumlu olarak tablo adlarını küçük harfle tut.
@@ -26,6 +49,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             }
         }
 
+        // Başlangıç kullanıcılarını tohumla (Seed Data)
         modelBuilder.Entity<UserEntity>().HasData(
             new UserEntity
             {

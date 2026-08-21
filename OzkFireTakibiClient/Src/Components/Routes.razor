@@ -1,3 +1,8 @@
+@*
+    Uygulama Yönlendirme ve Rota Yönetimi Bileşeni (Routes.razor)
+    Blazor Router, yetkilendirme yönlendirmeleri, oturum durumu değişiklikleri ve güvenli returnUrl yönlendirmesini yönetir.
+*@
+
 @using Microsoft.AspNetCore.WebUtilities
 @using OzkFireTakibiClient.Src
 @implements IDisposable
@@ -34,12 +39,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Kimlik doğrulama ve sayfa konumu değişiklik olaylarına abone ol
         AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
         NavigationManager.LocationChanged += HandleLocationChanged;
 
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAuthenticated = authenticationState.User.Identity?.IsAuthenticated == true;
 
+        // Kullanıcı zaten oturum açmışsa ve /giris sayfasındaysa anasayfaya yönlendir
         if (isAuthenticated && IsLoginRoute(NavigationManager.Uri))
         {
             NavigateIfNeeded("/");
@@ -51,6 +58,9 @@
         _ = RedirectForAuthenticationStateAsync(authenticationStateTask);
     }
 
+    /// <summary>
+    /// Oturum durumu değiştiğinde uygun sayfaya (hedef URL veya /giris) yönlendirir.
+    /// </summary>
     private async Task RedirectForAuthenticationStateAsync(Task<AuthenticationState> authenticationStateTask)
     {
         var authenticationState = await authenticationStateTask;
@@ -71,6 +81,9 @@
         }
     }
 
+    /// <summary>
+    /// URL query parametrelerindeki returnUrl değerini doğrular ve güvenli ise döndürür (Open Redirect güvenlik açığını önler).
+    /// </summary>
     private string GetAuthenticatedTargetUrl()
     {
         var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
@@ -85,6 +98,7 @@
         }
 
         var targetUrl = returnUrl.Trim();
+        // Harici veya güvensiz URL'leri engelle
         if (Uri.TryCreate(targetUrl, UriKind.Absolute, out _) ||
             targetUrl.StartsWith("//", StringComparison.Ordinal) ||
             targetUrl.StartsWith('\\') ||
@@ -119,3 +133,4 @@
         NavigationManager.LocationChanged -= HandleLocationChanged;
     }
 }
+

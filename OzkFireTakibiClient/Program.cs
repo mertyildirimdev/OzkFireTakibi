@@ -11,51 +11,80 @@ using OzkFireTakibiClient.Src.Services;
 using OzkFireTakibiClient.Src.Authorization;
 using OzkFireTakibiClient.Src.Options;
 
+// ============================================================================
+// Uygulama Başlangıç ve Yapılandırma Dosyası (Program.cs)
+// Blazor Server servisleri, SQLite veritabanı, kimlik doğrulama,
+// yetkilendirme politikaları ve middleware ardışık düzeni burada yapılandırılır.
+// ============================================================================
+
 var builder = WebApplication.CreateBuilder(args);
 
+// Excel dosyalarının doğru karakter seti (özellikle Türkçe Windows-1254) ile okunabilmesi için encoding sağlayıcısını kaydet
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-// Add services to the container.
+// --- Servis Kayıtları ---
+
+// Etkileşimli Blazor Server bileşenlerini kaydet
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// SQLite veritabanı için DbContext Factory kaydı (Blazor Server'ın eşzamanlı/scoped yaşam döngüsü için önerilen yaklaşım)
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Temel iş mantığı ve yardımcı servisleri (BaseService türevleri, parser, import servisi vb.) DI konteynerine kaydet
 builder.Services.AddBaseServices();
 
+// Veri koruma (Data Protection) yapılandırması
 builder.Services.AddDataProtection()
     .SetApplicationName("OzkFireTakibi");
 
+// Rapor yükleme yapılandırma seçeneklerini appsettings.json'dan bağla
 builder.Services.Configure<ReportImportOptions>(builder.Configuration.GetSection(ReportImportOptions.SectionName));
+
+// Rapor yönetimi için rol bazlı yetkilendirme ilkelerini tanımla
 builder.Services.AddAuthorizationCore(options =>
 {
+    // Rapor yükleme: Admin ve Moderator rolleri yapabilir
     options.AddPolicy(ReportPolicies.CanImportReports, policy =>
         policy.RequireRole(UserRole.Admin.ToString(), UserRole.Moderator.ToString()));
+
+    // Rapor silme: Sadece Admin rolü yapabilir
     options.AddPolicy(ReportPolicies.CanDeleteReports, policy =>
         policy.RequireRole(UserRole.Admin.ToString()));
 });
+
+// Kimlik doğrulama durumunu alt bileşenlere basamaklı (cascading) olarak aktar
 builder.Services.AddCascadingAuthenticationState();
+
+// Güvenli tarayıcı yerel ve oturum depolama servisleri
 builder.Services.AddScoped<ProtectedLocalStorage>();
 builder.Services.AddScoped<ProtectedSessionStorage>();
+
+// Özel kimlik doğrulama sağlayıcısı (CustomStateProvider) kaydı
 builder.Services.AddScoped<AuthenticationStateProvider, CustomStateProvider>();
 builder.Services.AddScoped(sp => (CustomStateProvider)sp.GetRequiredService<AuthenticationStateProvider>());
 
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// --- HTTP İstek Ardışık Düzeni (Middleware Pipeline) Yapılandırması ---
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    // Üretim ortamı için varsayılan HSTS değeri
     app.UseHsts();
 }
+
+// 404 ve diğer durum kodlarını özel hata sayfasına yönlendir
 app.UseStatusCodePagesWithReExecute("/notfound", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+// CSRF / Antiforgery koruması
 app.UseAntiforgery();
 
+// Statik dosyaları ve Blazor kök bileşenini bağla
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

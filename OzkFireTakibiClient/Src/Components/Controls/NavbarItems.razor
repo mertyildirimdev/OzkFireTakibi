@@ -1,3 +1,8 @@
+@*
+    Navigasyon Menü Öğeleri Bileşeni (NavbarItems.razor)
+    Sol menü ve mobil menüde ortak olarak kullanılan navigasyon bağlantılarını listeler.
+*@
+
 <div class="p-4">
     <aside class="menu">
         <p class="menu-label">Genel</p>
@@ -20,9 +25,15 @@
 </div>
 
 @code {
+    /// <summary>
+    /// Menü öğesine tıklandığında üst bileşeni bilgilendiren olay geri çağrımı (örn: mobil menüyü kapatmak için)
+    /// </summary>
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
+    /// <summary>
+    /// Navigasyon menü bağlantı modeli
+    /// </summary>
     private class NavItem
     {
         public string Title { get; set; } = default!;
@@ -30,6 +41,9 @@
         public string Url { get; set; } =  default!;
     }
 
+    /// <summary>
+    /// Menüde gösterilecek aktif bağlantıların listesi
+    /// </summary>
     private readonly List<NavItem> navItems = new List<NavItem>
     {
         new NavItem { Title = "Anasayfa", Icon = "fas fa-house", Url = "" },
@@ -44,4 +58,3 @@
         }
     }
 }
-

@@ -1,3 +1,11 @@
+@*
+    Rapor Yönetim Sayfası (Raporlar.razor)
+    - Aylık kesinleşen ve kümülatif karşılaştırma Excel'lerini çift olarak yükleme ve önizleme
+    - İki dosyanın tek transaction içinde sisteme aktarımı
+    - Bağlı rapor dönemlerinin (aylık + kümülatif eşleşme) durumunu izleme
+    - Yükleme geçmişi ve Admin yetkisiyle rapor silme (otomatik önceki sürüm aktivasyonu ile)
+*@
+
 @page "/raporlar"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -6,6 +14,7 @@
 @using OzkFireTakibiClient.Src.Data.Entities
 
 <PageTitle>Raporlar</PageTitle>
+
 
 <div class="container">
     <div class="level mb-5">
