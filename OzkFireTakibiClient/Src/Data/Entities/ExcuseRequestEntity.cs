@@ -1,28 +1,31 @@
 namespace OzkFireTakibiClient.Src.Data.Entities;
 
 /// <summary>
-/// Aylık kategori fire büyüklüğünü aşan mağaza × kategori satırı için açılan mazeret talebi.
+/// Bir mağaza özeti veya mağaza × kategori rapor satırı için açılan mazeret talebi.
 /// </summary>
 public class ExcuseRequestEntity : BaseEntity<long>
 {
-    public long ReportImportId { get; set; }
     public long ReportRowId { get; set; }
-    public int StoreNumber { get; set; }
-    public string StoreName { get; set; } = default!;
-    public string CategoryCode { get; set; } = default!;
-    public string CategoryName { get; set; } = default!;
-    public decimal CategoryAverageWasteRate { get; set; }
-    public decimal StoreWasteRate { get; set; }
-    public decimal ThresholdWasteRate { get; set; }
-    public decimal DeviationPercent { get; set; }
+    public ExcuseSource Source { get; set; }
+    public string Title { get; set; } = default!;
+    public string? RequestNote { get; set; }
+    public int? RequestedByUserId { get; set; }
+    public decimal? ThresholdRate { get; set; }
     public ExcuseStatus Status { get; set; } = ExcuseStatus.Open;
     public ExcuseStatus? StatusBeforeSuperseded { get; set; }
     public long? SupersededByReportImportId { get; set; }
     public DateTime? RespondedAtUtc { get; set; }
     public DateTime? ReviewedAtUtc { get; set; }
 
-    public ReportImportEntity ReportImport { get; set; } = default!;
+    public ReportRowEntity ReportRow { get; set; } = default!;
+    public UserEntity? RequestedByUser { get; set; }
     public ICollection<ExcuseEntryEntity> Entries { get; set; } = new List<ExcuseEntryEntity>();
+}
+
+public enum ExcuseSource
+{
+    Automatic,
+    Manual
 }
 
 public enum ExcuseStatus

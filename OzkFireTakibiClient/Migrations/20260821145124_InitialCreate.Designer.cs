@@ -12,7 +12,7 @@ using OzkFireTakibiClient.Src.Data;
 namespace OzkFireTakibiClient.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260821135043_InitialCreate")]
+    [Migration("20260821145124_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -76,38 +76,29 @@ namespace OzkFireTakibiClient.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<decimal>("CategoryAverageWasteRate")
-                        .HasPrecision(20, 6)
-                        .HasColumnType("decimal(20,6)");
-
-                    b.Property<string>("CategoryCode")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("CategoryName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal>("DeviationPercent")
-                        .HasPrecision(20, 6)
-                        .HasColumnType("decimal(20,6)");
-
-                    b.Property<long>("ReportImportId")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("ReportRowId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("RequestNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("RequestedByUserId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("RespondedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ReviewedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -118,36 +109,29 @@ namespace OzkFireTakibiClient.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
-                    b.Property<string>("StoreName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("nvarchar(160)");
-
-                    b.Property<int>("StoreNumber")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("StoreWasteRate")
-                        .HasPrecision(20, 6)
-                        .HasColumnType("decimal(20,6)");
-
                     b.Property<long?>("SupersededByReportImportId")
                         .HasColumnType("bigint");
 
-                    b.Property<decimal>("ThresholdWasteRate")
+                    b.Property<decimal?>("ThresholdRate")
                         .HasPrecision(20, 6)
                         .HasColumnType("decimal(20,6)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.HasIndex("StoreNumber", "Status");
-
-                    b.HasIndex("ReportImportId", "StoreNumber", "CategoryCode")
+                    b.HasIndex("ReportRowId")
                         .IsUnique();
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("excuse_requests", (string)null);
                 });
@@ -468,6 +452,8 @@ namespace OzkFireTakibiClient.Migrations
 
                     b.HasIndex("ReportImportId", "StoreNumber");
 
+                    b.HasIndex("StoreNumber", "RowType");
+
                     b.ToTable("report_rows", (string)null);
                 });
 
@@ -584,13 +570,20 @@ namespace OzkFireTakibiClient.Migrations
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ExcuseRequestEntity", b =>
                 {
-                    b.HasOne("OzkFireTakibiClient.Src.Data.Entities.ReportImportEntity", "ReportImport")
-                        .WithMany("ExcuseRequests")
-                        .HasForeignKey("ReportImportId")
+                    b.HasOne("OzkFireTakibiClient.Src.Data.Entities.ReportRowEntity", "ReportRow")
+                        .WithOne("ExcuseRequest")
+                        .HasForeignKey("OzkFireTakibiClient.Src.Data.Entities.ExcuseRequestEntity", "ReportRowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ReportImport");
+                    b.HasOne("OzkFireTakibiClient.Src.Data.Entities.UserEntity", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReportRow");
+
+                    b.Navigation("RequestedByUser");
                 });
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportImportEntity", b =>
@@ -630,14 +623,17 @@ namespace OzkFireTakibiClient.Migrations
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportImportEntity", b =>
                 {
-                    b.Navigation("ExcuseRequests");
-
                     b.Navigation("Rows");
                 });
 
             modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportPeriodEntity", b =>
                 {
                     b.Navigation("Imports");
+                });
+
+            modelBuilder.Entity("OzkFireTakibiClient.Src.Data.Entities.ReportRowEntity", b =>
+                {
+                    b.Navigation("ExcuseRequest");
                 });
 #pragma warning restore 612, 618
         }

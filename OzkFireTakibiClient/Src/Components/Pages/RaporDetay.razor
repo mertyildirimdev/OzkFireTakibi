@@ -11,6 +11,7 @@
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
 @inject ReportImportService ReportImportService
+@inject ExcuseService ExcuseService
 @using OzkFireTakibiClient.Src.Data.Entities
 
 <PageTitle>Rapor Detayı</PageTitle>
@@ -49,6 +50,11 @@
                 <span>@errorMessage</span>
             </span>
         </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="notification is-success is-light" role="status">@successMessage</div>
     }
 
     @if (isLoading && detail is null)
@@ -279,6 +285,10 @@
                                             rowspan="@(ShowComparisonSubheaders ? 2 : 1)">@field.Label</th>
                                     }
                                 }
+                                @if (CanCreateManualCategoryExcuse)
+                                {
+                                    <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">İşlem</th>
+                                }
                             </tr>
                             @if (ShowComparisonSubheaders)
                             {
@@ -311,6 +321,14 @@
                                         {
                                             <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row.Comparison)</td>
                                         }
+                                    }
+                                    @if (CanCreateManualCategoryExcuse)
+                                    {
+                                        <td>
+                                            <button class="button is-small is-warning is-light" type="button" @onclick="() => OpenExcuseRequest(row)">
+                                                Mazeret iste
+                                            </button>
+                                        </td>
                                     }
                                 </tr>
                             }
@@ -384,6 +402,43 @@
     </div>
 }
 
+@if (pendingExcuseRow is not null)
+{
+    <div class="modal is-active" role="dialog" aria-modal="true" aria-labelledby="excuse-request-title">
+        <div class="modal-background" @onclick="CloseExcuseRequest"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p id="excuse-request-title" class="modal-card-title">Alt kategori için mazeret iste</p>
+                <button class="delete" type="button" aria-label="Kapat" @onclick="CloseExcuseRequest"></button>
+            </header>
+            <section class="modal-card-body">
+                @if (!string.IsNullOrWhiteSpace(manualExcuseError))
+                {
+                    <div class="notification is-danger is-light">@manualExcuseError</div>
+                }
+                <div class="notification is-light">
+                    <p class="has-text-weight-semibold">@DisplayText(pendingExcuseRow.CategoryName)</p>
+                    <p class="is-size-7 has-text-grey">@DisplayText(pendingExcuseRow.StoreName) · Depo No: @(pendingExcuseRow.StoreNumber?.ToString() ?? "–")</p>
+                </div>
+                <div class="field">
+                    <label class="label">Talep notu</label>
+                    <div class="control">
+                        <textarea class="textarea" rows="5" maxlength="2000" placeholder="Mağazadan hangi konunun açıklanmasını istediğinizi yazın." @bind="manualExcuseNote"></textarea>
+                    </div>
+                    <p class="help">En az 5 karakter.</p>
+                </div>
+            </section>
+            <footer class="modal-card-foot is-justify-content-flex-end">
+                <button class="button is-light" type="button" disabled="@isCreatingExcuse" @onclick="CloseExcuseRequest">Vazgeç</button>
+                <button class="button is-warning" type="button" disabled="@(isCreatingExcuse || manualExcuseNote.Trim().Length < 5)" @onclick="CreateManualExcuseAsync">
+                    <span class="icon"><i class="fas fa-comment-dots"></i></span>
+                    <span>Mazeret iste</span>
+                </button>
+            </footer>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public long ImportId { get; set; }
@@ -441,9 +496,20 @@
     private ReportRowType selectedRowType = ReportRowType.CategorySummary;
     private string searchText = string.Empty;
     private string? errorMessage;
+    private string? successMessage;
     private bool isLoading;
     private bool compareWithCumulative;
     private bool isFieldSelectorOpen;
+    private ReportDetailRowItem? pendingExcuseRow;
+    private string manualExcuseNote = string.Empty;
+    private string? manualExcuseError;
+    private bool isCreatingExcuse;
+
+    private bool CanCreateManualCategoryExcuse =>
+        currentUser.IsInRole("Admin") &&
+        detail?.Header.PeriodType == ReportPeriodType.Monthly &&
+        detail.Header.IsActive &&
+        selectedRowType == ReportRowType.StoreCategory;
 
     private HashSet<string> SelectedFieldKeys
     {
@@ -511,6 +577,52 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private void OpenExcuseRequest(ReportDetailRowItem row)
+    {
+        pendingExcuseRow = row;
+        manualExcuseNote = string.Empty;
+        manualExcuseError = null;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void CloseExcuseRequest()
+    {
+        if (isCreatingExcuse) return;
+        pendingExcuseRow = null;
+        manualExcuseNote = string.Empty;
+        manualExcuseError = null;
+    }
+
+    private async Task CreateManualExcuseAsync()
+    {
+        if (pendingExcuseRow is null || isCreatingExcuse) return;
+        isCreatingExcuse = true;
+        manualExcuseError = null;
+        successMessage = null;
+
+        try
+        {
+            var excuseId = await ExcuseService.CreateManualCategoryRequestAsync(
+                pendingExcuseRow.Id,
+                manualExcuseNote,
+                currentUser,
+                cancellationTokenSource.Token);
+            NavigationManager.NavigateTo($"/mazeretler/{excuseId}");
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            manualExcuseError = exception.Message;
+        }
+        finally
+        {
+            isCreatingExcuse = false;
         }
     }
 

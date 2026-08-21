@@ -7,11 +7,12 @@ using OzkFireTakibiClient.Src.Data;
 using OzkFireTakibiClient.Src.Data.Entities;
 using OzkFireTakibiClient.Src.Excuses;
 using OzkFireTakibiClient.Src.Options;
+using OzkFireTakibiClient.Src.ReportImports;
 
 namespace OzkFireTakibiClient.Src.Services;
 
 /// <summary>
-/// Mazeret taleplerinin yetkilendirilmiş sorgulama, cevap ve değerlendirme işlemlerini yönetir.
+/// Rapor satırlarına bağlı mazeretlerin sorgulama, cevap ve değerlendirme işlemlerini yönetir.
 /// </summary>
 public sealed class ExcuseService(
     IDbContextFactory<AppDbContext> dbContextFactory,
@@ -35,8 +36,8 @@ public sealed class ExcuseService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var accessibleQuery = ApplyReadAccess(dbContext.ExcuseRequests.AsNoTracking(), access);
-
         var activeQuery = accessibleQuery.Where(request => request.Status != ExcuseStatus.Superseded);
+
         var openCount = await activeQuery.CountAsync(request => request.Status == ExcuseStatus.Open, cancellationToken);
         var answeredCount = await activeQuery.CountAsync(request => request.Status == ExcuseStatus.Answered, cancellationToken);
         var revisionCount = await activeQuery.CountAsync(request => request.Status == ExcuseStatus.RevisionRequested, cancellationToken);
@@ -49,40 +50,82 @@ public sealed class ExcuseService(
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             query = query.Where(request =>
-                request.StoreName.Contains(normalizedSearch) ||
-                request.CategoryName.Contains(normalizedSearch) ||
-                request.CategoryCode.Contains(normalizedSearch));
+                request.Title.Contains(normalizedSearch) ||
+                (request.ReportRow.StoreName != null && request.ReportRow.StoreName.Contains(normalizedSearch)) ||
+                (request.ReportRow.CategoryName != null && request.ReportRow.CategoryName.Contains(normalizedSearch)) ||
+                (request.ReportRow.CategoryCode != null && request.ReportRow.CategoryCode.Contains(normalizedSearch)));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
         pageNumber = Math.Min(pageNumber, totalPages);
 
-        var items = await query
+        var rawItems = await query
             .OrderBy(request => request.Status == ExcuseStatus.RevisionRequested ? 0 :
                 request.Status == ExcuseStatus.Open ? 1 :
                 request.Status == ExcuseStatus.Answered ? 2 : 3)
-            .ThenByDescending(request => request.ReportImport.EndDate)
-            .ThenBy(request => request.StoreName)
-            .ThenBy(request => request.CategoryName)
+            .ThenByDescending(request => request.ReportRow.ReportImport.EndDate)
+            .ThenBy(request => request.Title)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(request => new ExcuseListItem
+            .Select(request => new
             {
-                Id = request.Id,
-                Scope = request.ReportImport.Scope,
-                PeriodEndDate = request.ReportImport.EndDate,
-                StoreNumber = request.StoreNumber,
-                StoreName = request.StoreName,
-                CategoryCode = request.CategoryCode,
-                CategoryName = request.CategoryName,
-                CategoryAverageWasteRate = request.CategoryAverageWasteRate,
-                StoreWasteRate = request.StoreWasteRate,
-                DeviationPercent = request.DeviationPercent,
-                Status = request.Status,
-                CreatedAtUtc = request.CreatedAt
+                request.Id,
+                request.Title,
+                request.Source,
+                TargetRowType = request.ReportRow.RowType,
+                request.ReportRow.ReportImport.Scope,
+                PeriodEndDate = request.ReportRow.ReportImport.EndDate,
+                StoreNumber = request.ReportRow.StoreNumber!.Value,
+                StoreName = request.ReportRow.StoreName!,
+                TargetCode = request.ReportRow.RowType == ReportRowType.StoreCategory
+                    ? request.ReportRow.CategoryCode
+                    : request.ReportRow.StockCode,
+                TargetName = request.ReportRow.RowType == ReportRowType.StoreCategory
+                    ? request.ReportRow.CategoryName
+                    : request.ReportRow.StockName,
+                BenchmarkRate = request.ReportRow.RowType == ReportRowType.StoreSummary
+                    ? dbContext.ReportRows
+                        .Where(row => row.ReportImportId == request.ReportRow.ReportImportId && row.RowType == ReportRowType.General)
+                        .Select(row => row.WasteRate)
+                        .FirstOrDefault()
+                    : request.ReportRow.RowType == ReportRowType.StoreCategory
+                        ? dbContext.ReportRows
+                            .Where(row =>
+                                row.ReportImportId == request.ReportRow.ReportImportId &&
+                                row.RowType == ReportRowType.CategorySummary &&
+                                row.CategoryCode == request.ReportRow.CategoryCode)
+                            .Select(row => row.WasteRate)
+                            .FirstOrDefault()
+                        : null,
+                StoreRate = request.ReportRow.WasteRate,
+                request.ThresholdRate,
+                request.Status,
+                request.CreatedAt
             })
             .ToArrayAsync(cancellationToken);
+
+        var items = rawItems.Select(item => new ExcuseListItem
+        {
+            Id = item.Id,
+            Title = item.Title,
+            Source = item.Source,
+            TargetRowType = item.TargetRowType,
+            Scope = item.Scope,
+            PeriodEndDate = item.PeriodEndDate,
+            StoreNumber = item.StoreNumber,
+            StoreName = item.StoreName ?? item.StoreNumber.ToString(),
+            TargetCode = item.TargetCode,
+            TargetName = item.TargetRowType == ReportRowType.StoreSummary
+                ? ReportDisplayNames.Scope(item.Scope)
+                : item.TargetName,
+            BenchmarkRate = item.BenchmarkRate,
+            StoreRate = item.StoreRate,
+            ThresholdRate = item.ThresholdRate,
+            DeviationPercent = CalculateDeviation(item.BenchmarkRate, item.StoreRate),
+            Status = item.Status,
+            CreatedAtUtc = item.CreatedAt
+        }).ToArray();
 
         return new ExcuseListResult
         {
@@ -110,20 +153,57 @@ public sealed class ExcuseService(
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var request = await ApplyReadAccess(dbContext.ExcuseRequests.AsNoTracking(), access)
-            .Include(item => item.ReportImport)
+            .Include(item => item.ReportRow)
+                .ThenInclude(row => row.ReportImport)
+            .Include(item => item.RequestedByUser)
             .Include(item => item.Entries)
                 .ThenInclude(entry => entry.CreatedByUser)
             .SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new ExcuseNotFoundException(id);
 
-        var topProducts = await dbContext.ReportRows
+        var targetRow = request.ReportRow;
+        var reportImport = targetRow.ReportImport;
+        var benchmarkRate = await GetBenchmarkRateAsync(dbContext, targetRow, cancellationToken);
+        var (cumulativeBenchmarkRate, cumulativeStoreRate) = await GetCumulativeRatesAsync(
+            dbContext,
+            targetRow,
+            reportImport,
+            cancellationToken);
+
+        var topCategories = targetRow.RowType == ReportRowType.StoreSummary
+            ? await dbContext.ReportRows
+                .AsNoTracking()
+                .Where(row =>
+                    row.ReportImportId == targetRow.ReportImportId &&
+                    row.RowType == ReportRowType.StoreCategory &&
+                    row.StoreNumber == targetRow.StoreNumber &&
+                    (row.WasteAmount < 0m || row.WasteRate < 0m))
+                .OrderBy(row => row.WasteAmount)
+                .ThenBy(row => row.WasteRate)
+                .Take(10)
+                .Select(row => new ExcuseCategoryItem
+                {
+                    CategoryCode = row.CategoryCode,
+                    CategoryName = row.CategoryName,
+                    WasteRate = row.WasteRate,
+                    WasteAmount = row.WasteAmount
+                })
+                .ToArrayAsync(cancellationToken)
+            : [];
+
+        var topProductsQuery = dbContext.ReportRows
             .AsNoTracking()
             .Where(row =>
-                row.ReportImportId == request.ReportImportId &&
+                row.ReportImportId == targetRow.ReportImportId &&
                 row.RowType == ReportRowType.StoreProduct &&
-                row.StoreNumber == request.StoreNumber &&
-                row.CategoryCode == request.CategoryCode &&
-                (row.WasteAmount < 0m || row.WasteRate < 0m))
+                row.StoreNumber == targetRow.StoreNumber &&
+                (row.WasteAmount < 0m || row.WasteRate < 0m));
+        if (targetRow.RowType == ReportRowType.StoreCategory)
+        {
+            topProductsQuery = topProductsQuery.Where(row => row.CategoryCode == targetRow.CategoryCode);
+        }
+
+        var topProducts = await topProductsQuery
             .OrderBy(row => row.WasteAmount)
             .ThenBy(row => row.WasteRate)
             .Take(10)
@@ -138,24 +218,35 @@ public sealed class ExcuseService(
 
         var canReview = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanReviewExcuses);
         var canRespond = access.IsStoreUser &&
-            MatchesStore(access, request) &&
+            MatchesStore(access, targetRow) &&
             request.Status is ExcuseStatus.Open or ExcuseStatus.RevisionRequested;
 
         return new ExcuseDetailResult
         {
             Id = request.Id,
-            ReportImportId = request.ReportImportId,
-            Scope = request.ReportImport.Scope,
-            StartDate = request.ReportImport.StartDate,
-            EndDate = request.ReportImport.EndDate,
-            StoreNumber = request.StoreNumber,
-            StoreName = request.StoreName,
-            CategoryCode = request.CategoryCode,
-            CategoryName = request.CategoryName,
-            CategoryAverageWasteRate = request.CategoryAverageWasteRate,
-            StoreWasteRate = request.StoreWasteRate,
-            ThresholdWasteRate = request.ThresholdWasteRate,
-            DeviationPercent = request.DeviationPercent,
+            ReportImportId = targetRow.ReportImportId,
+            Title = request.Title,
+            Source = request.Source,
+            TargetRowType = targetRow.RowType,
+            Scope = reportImport.Scope,
+            StartDate = reportImport.StartDate,
+            EndDate = reportImport.EndDate,
+            StoreNumber = targetRow.StoreNumber!.Value,
+            StoreName = targetRow.StoreName ?? targetRow.StoreNumber.Value.ToString(),
+            TargetCode = targetRow.RowType == ReportRowType.StoreCategory ? targetRow.CategoryCode : targetRow.StockCode,
+            TargetName = targetRow.RowType == ReportRowType.StoreSummary
+                ? ReportDisplayNames.Scope(reportImport.Scope)
+                : targetRow.RowType == ReportRowType.StoreCategory ? targetRow.CategoryName : targetRow.StockName,
+            RequestNote = request.RequestNote,
+            RequestedBy = request.RequestedByUser is null
+                ? null
+                : request.RequestedByUser.Name ?? request.RequestedByUser.Email,
+            BenchmarkRate = benchmarkRate,
+            StoreRate = targetRow.WasteRate,
+            ThresholdRate = request.ThresholdRate,
+            DeviationPercent = CalculateDeviation(benchmarkRate, targetRow.WasteRate),
+            CumulativeBenchmarkRate = cumulativeBenchmarkRate,
+            CumulativeStoreRate = cumulativeStoreRate,
             Status = request.Status,
             Entries = request.Entries
                 .OrderBy(entry => entry.CreatedAt)
@@ -168,10 +259,68 @@ public sealed class ExcuseService(
                     CreatedAtUtc = entry.CreatedAt
                 })
                 .ToArray(),
+            TopCategories = topCategories,
             TopProducts = topProducts,
             CanRespond = canRespond,
             CanReview = canReview.Succeeded && request.Status == ExcuseStatus.Answered
         };
+    }
+
+    public async Task<long> CreateManualCategoryRequestAsync(
+        long reportRowId,
+        string note,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated(user);
+        var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanManageExcuseStores);
+        if (!authorization.Succeeded)
+        {
+            throw new UnauthorizedAccessException("Alt kategori için mazeret isteme yetkiniz bulunmuyor.");
+        }
+
+        var normalizedNote = ValidateMessage(note, 5);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var row = await dbContext.ReportRows
+            .Include(item => item.ReportImport)
+            .SingleOrDefaultAsync(item => item.Id == reportRowId, cancellationToken)
+            ?? throw new InvalidOperationException("Seçilen rapor satırı bulunamadı.");
+
+        if (row.RowType != ReportRowType.StoreCategory ||
+            row.ReportImport.PeriodType != ReportPeriodType.Monthly ||
+            !row.ReportImport.IsActive ||
+            row.StoreNumber is null)
+        {
+            throw new InvalidOperationException("Yalnızca aktif aylık raporun mağaza × kategori satırından mazeret istenebilir.");
+        }
+
+        var isEligible = await dbContext.Stores
+            .AnyAsync(store => store.Id == row.StoreNumber.Value && store.IsExcuseEligible, cancellationToken);
+        if (!isEligible)
+        {
+            throw new InvalidOperationException("Seçilen mağaza mazeret kapsamı dışında.");
+        }
+
+        if (await dbContext.ExcuseRequests.AnyAsync(request => request.ReportRowId == row.Id, cancellationToken))
+        {
+            throw new InvalidOperationException("Bu mağaza ve alt kategori için zaten bir mazeret talebi bulunuyor.");
+        }
+
+        var now = DateTime.UtcNow;
+        var request = new ExcuseRequestEntity
+        {
+            ReportRowId = row.Id,
+            Source = ExcuseSource.Manual,
+            Title = $"{row.CategoryName ?? row.CategoryCode ?? "Alt kategori"} — {row.StoreName ?? row.StoreNumber.Value.ToString()}",
+            RequestNote = normalizedNote,
+            RequestedByUserId = GetUserId(user),
+            Status = ExcuseStatus.Open,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        dbContext.ExcuseRequests.Add(request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return request.Id;
     }
 
     public async Task SubmitResponseAsync(
@@ -191,10 +340,11 @@ public sealed class ExcuseService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var request = await dbContext.ExcuseRequests
+            .Include(item => item.ReportRow)
             .SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new ExcuseNotFoundException(id);
 
-        if (!MatchesStore(access, request))
+        if (!MatchesStore(access, request.ReportRow))
         {
             throw new UnauthorizedAccessException("Bu mazeret talebi kullanıcının bağlı olduğu mağazaya ait değil.");
         }
@@ -240,10 +390,8 @@ public sealed class ExcuseService(
             : ValidateMessage(message, 5);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var request = await dbContext.ExcuseRequests
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
+        var request = await dbContext.ExcuseRequests.SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new ExcuseNotFoundException(id);
-
         if (request.Status != ExcuseStatus.Answered)
         {
             throw new InvalidOperationException("Yalnızca yanıtlanmış bir mazeret değerlendirilebilir.");
@@ -271,9 +419,7 @@ public sealed class ExcuseService(
     {
         await EnsureStoreManagementAsync(user);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.Stores
-            .AsNoTracking()
-            .OrderBy(store => store.Name)
+        return await dbContext.Stores.AsNoTracking().OrderBy(store => store.Name)
             .Select(store => new ExcuseStoreItem
             {
                 StoreNumber = store.Id,
@@ -298,6 +444,67 @@ public sealed class ExcuseService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private static async Task<decimal?> GetBenchmarkRateAsync(
+        AppDbContext dbContext,
+        ReportRowEntity targetRow,
+        CancellationToken cancellationToken) => targetRow.RowType switch
+    {
+        ReportRowType.StoreSummary => await dbContext.ReportRows.AsNoTracking()
+            .Where(row => row.ReportImportId == targetRow.ReportImportId && row.RowType == ReportRowType.General)
+            .Select(row => row.WasteRate)
+            .SingleOrDefaultAsync(cancellationToken),
+        ReportRowType.StoreCategory => await dbContext.ReportRows.AsNoTracking()
+            .Where(row =>
+                row.ReportImportId == targetRow.ReportImportId &&
+                row.RowType == ReportRowType.CategorySummary &&
+                row.CategoryCode == targetRow.CategoryCode)
+            .Select(row => row.WasteRate)
+            .SingleOrDefaultAsync(cancellationToken),
+        _ => null
+    };
+
+    private static async Task<(decimal? BenchmarkRate, decimal? StoreRate)> GetCumulativeRatesAsync(
+        AppDbContext dbContext,
+        ReportRowEntity targetRow,
+        ReportImportEntity reportImport,
+        CancellationToken cancellationToken)
+    {
+        var cumulativeImportId = await dbContext.ReportImports.AsNoTracking()
+            .Where(item =>
+                item.ReportPeriodId == reportImport.ReportPeriodId &&
+                item.PeriodType == ReportPeriodType.Cumulative &&
+                item.IsActive)
+            .Select(item => (long?)item.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!cumulativeImportId.HasValue)
+        {
+            return (null, null);
+        }
+
+        var benchmarkRate = targetRow.RowType == ReportRowType.StoreSummary
+            ? await dbContext.ReportRows.AsNoTracking()
+                .Where(row => row.ReportImportId == cumulativeImportId.Value && row.RowType == ReportRowType.General)
+                .Select(row => row.WasteRate)
+                .SingleOrDefaultAsync(cancellationToken)
+            : await dbContext.ReportRows.AsNoTracking()
+                .Where(row =>
+                    row.ReportImportId == cumulativeImportId.Value &&
+                    row.RowType == ReportRowType.CategorySummary &&
+                    row.CategoryCode == targetRow.CategoryCode)
+                .Select(row => row.WasteRate)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        var storeRate = await dbContext.ReportRows.AsNoTracking()
+            .Where(row =>
+                row.ReportImportId == cumulativeImportId.Value &&
+                row.RowType == targetRow.RowType &&
+                row.StoreNumber == targetRow.StoreNumber &&
+                (targetRow.RowType != ReportRowType.StoreCategory || row.CategoryCode == targetRow.CategoryCode))
+            .Select(row => row.WasteRate)
+            .SingleOrDefaultAsync(cancellationToken);
+        return (benchmarkRate, storeRate);
+    }
+
     private async Task EnsureStoreManagementAsync(ClaimsPrincipal user)
     {
         EnsureAuthenticated(user);
@@ -319,11 +526,11 @@ public sealed class ExcuseService(
 
         if (access.StoreNumber.HasValue)
         {
-            return query.Where(request => request.StoreNumber == access.StoreNumber.Value);
+            return query.Where(request => request.ReportRow.StoreNumber == access.StoreNumber.Value);
         }
 
         return !string.IsNullOrWhiteSpace(access.StoreName)
-            ? query.Where(request => request.StoreName == access.StoreName)
+            ? query.Where(request => request.ReportRow.StoreName == access.StoreName)
             : query.Where(_ => false);
     }
 
@@ -331,17 +538,28 @@ public sealed class ExcuseService(
     {
         var isStoreUser = user.IsInRole(UserRole.User.ToString());
         var storeNumberClaim = user.FindFirstValue("StoreNumber");
-        var storeNumber = int.TryParse(storeNumberClaim, out var parsedStoreNumber)
-            ? parsedStoreNumber
-            : (int?)null;
+        var storeNumber = int.TryParse(storeNumberClaim, out var parsedStoreNumber) ? parsedStoreNumber : (int?)null;
         return new ExcuseAccess(isStoreUser, storeNumber, user.FindFirstValue("StoreName"));
     }
 
-    private static bool MatchesStore(ExcuseAccess access, ExcuseRequestEntity request) =>
+    private static bool MatchesStore(ExcuseAccess access, ReportRowEntity row) =>
         access.StoreNumber.HasValue
-            ? access.StoreNumber.Value == request.StoreNumber
+            ? access.StoreNumber.Value == row.StoreNumber
             : !string.IsNullOrWhiteSpace(access.StoreName) &&
-              string.Equals(access.StoreName, request.StoreName, StringComparison.OrdinalIgnoreCase);
+              string.Equals(access.StoreName, row.StoreName, StringComparison.OrdinalIgnoreCase);
+
+    private static decimal? CalculateDeviation(decimal? benchmarkRate, decimal? storeRate)
+    {
+        if (!benchmarkRate.HasValue || !storeRate.HasValue)
+        {
+            return null;
+        }
+
+        var benchmarkMagnitude = Math.Abs(benchmarkRate.Value);
+        return benchmarkMagnitude == 0m
+            ? 100m
+            : ((Math.Abs(storeRate.Value) / benchmarkMagnitude) - 1m) * 100m;
+    }
 
     private static string ValidateMessage(string? message, int minimumLength)
     {

@@ -5,7 +5,7 @@ namespace OzkFireTakibiClient.Src.Data;
 
 /// <summary>
 /// Uygulamanın Entity Framework Core veritabanı bağlamı (DbContext).
-/// SQLite veritabanı şeması, tablo/kolon eşlemeleri, indeksler ve ilişkileri yapılandırır.
+/// SQL Server veritabanı şeması, tablo/kolon eşlemeleri, indeksler ve ilişkileri yapılandırır.
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
@@ -46,7 +46,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         ConfigureReportImports(modelBuilder);
         ConfigureExcuses(modelBuilder);
 
-        // Mevcut migration ve SQLite şemasıyla uyumlu olarak tablo adlarını küçük harfle tut.
+        // Veritabanı tablo adlarını tutarlı biçimde küçük harfle tanımla.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var currentTableName = entityType.GetTableName();
@@ -128,6 +128,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         reportRow.HasIndex(x => new { x.ReportImportId, x.SourceRowNumber }).IsUnique();
         reportRow.HasIndex(x => new { x.ReportImportId, x.RowType });
         reportRow.HasIndex(x => new { x.ReportImportId, x.StoreNumber });
+        reportRow.HasIndex(x => new { x.StoreNumber, x.RowType });
         reportRow.HasIndex(x => new { x.ReportImportId, x.CategoryCode });
         reportRow.HasIndex(x => new { x.ReportImportId, x.StockCode });
         reportRow
@@ -169,23 +170,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         var request = modelBuilder.Entity<ExcuseRequestEntity>();
         request.ToTable("excuse_requests");
-        request.Property(x => x.StoreName).HasMaxLength(160);
-        request.Property(x => x.CategoryCode).HasMaxLength(40);
-        request.Property(x => x.CategoryName).HasMaxLength(200);
+        request.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+        request.Property(x => x.Title).HasMaxLength(300);
+        request.Property(x => x.RequestNote).HasMaxLength(2000);
         request.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         request.Property(x => x.StatusBeforeSuperseded).HasConversion<string>().HasMaxLength(30);
-        request.Property(x => x.CategoryAverageWasteRate).HasPrecision(20, 6);
-        request.Property(x => x.StoreWasteRate).HasPrecision(20, 6);
-        request.Property(x => x.ThresholdWasteRate).HasPrecision(20, 6);
-        request.Property(x => x.DeviationPercent).HasPrecision(20, 6);
-        request.HasIndex(x => new { x.ReportImportId, x.StoreNumber, x.CategoryCode }).IsUnique();
-        request.HasIndex(x => new { x.StoreNumber, x.Status });
+        request.Property(x => x.ThresholdRate).HasPrecision(20, 6);
+        request.HasIndex(x => x.ReportRowId).IsUnique();
         request.HasIndex(x => new { x.Status, x.CreatedAt });
         request
-            .HasOne(x => x.ReportImport)
-            .WithMany(x => x.ExcuseRequests)
-            .HasForeignKey(x => x.ReportImportId)
+            .HasOne(x => x.ReportRow)
+            .WithOne(x => x.ExcuseRequest)
+            .HasForeignKey<ExcuseRequestEntity>(x => x.ReportRowId)
             .OnDelete(DeleteBehavior.Cascade);
+        request
+            .HasOne(x => x.RequestedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.RequestedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         var entry = modelBuilder.Entity<ExcuseEntryEntity>();
         entry.ToTable("excuse_entries");

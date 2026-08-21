@@ -31,13 +31,19 @@
         <div class="level mb-5">
             <div class="level-left">
                 <div>
-                    <div class="is-flex is-align-items-center mb-2">
-                        <h1 class="title is-3 mb-0 mr-3">@detail.StoreName</h1>
-                        <span class="tag @ExcuseDisplayNames.StatusCss(detail.Status)">@ExcuseDisplayNames.Status(detail.Status)</span>
+                    <div class="is-flex is-align-items-center is-flex-wrap-wrap mb-2">
+                        <h1 class="title is-3 mb-0 mr-3">@detail.Title</h1>
+                        <span class="tag mr-2 @ExcuseDisplayNames.StatusCss(detail.Status)">@ExcuseDisplayNames.Status(detail.Status)</span>
+                        <span class="tag mr-2 is-light">@ExcuseDisplayNames.Source(detail.Source)</span>
+                        <span class="tag is-info is-light">@ExcuseDisplayNames.Target(detail.TargetRowType)</span>
                     </div>
                     <p class="subtitle is-6 has-text-grey">
-                        @detail.CategoryName · @detail.CategoryCode · @detail.StartDate.ToString("dd.MM.yyyy") – @detail.EndDate.ToString("dd.MM.yyyy")
+                        @detail.StoreName · Depo No: @detail.StoreNumber · @detail.StartDate.ToString("dd.MM.yyyy") – @detail.EndDate.ToString("dd.MM.yyyy")
                     </p>
+                    @if (!string.IsNullOrWhiteSpace(detail.TargetName) || !string.IsNullOrWhiteSpace(detail.TargetCode))
+                    {
+                        <p class="is-size-7 has-text-grey">Hedef: @DisplayTarget(detail)</p>
+                    }
                 </div>
             </div>
             <div class="level-right">
@@ -53,32 +59,31 @@
             <div class="notification is-warning is-light">Bu talep daha yeni bir kesinleşen rapor yüklendiği için geçersiz kaldı. Geçmiş kayıt yalnızca denetim amacıyla gösteriliyor.</div>
         }
 
+        @if (!string.IsNullOrWhiteSpace(detail.RequestNote))
+        {
+            <div class="notification is-info is-light">
+                <p class="has-text-weight-semibold mb-1">Yönetici talebi</p>
+                <p>@detail.RequestNote</p>
+                @if (!string.IsNullOrWhiteSpace(detail.RequestedBy))
+                {
+                    <p class="is-size-7 has-text-grey mt-2">Talep eden: @detail.RequestedBy</p>
+                }
+            </div>
+        }
+
         <div class="columns is-multiline">
-            <div class="column is-one-quarter">
-                <div class="box">
-                    <p class="heading">Kategori aylık oranı</p>
-                    <p class="title is-4">@FormatRate(detail.CategoryAverageWasteRate)</p>
-                </div>
-            </div>
-            <div class="column is-one-quarter">
-                <div class="box">
-                    <p class="heading">%50 mazeret eşiği</p>
-                    <p class="title is-4">@FormatRate(detail.ThresholdWasteRate)</p>
-                </div>
-            </div>
-            <div class="column is-one-quarter">
-                <div class="box">
-                    <p class="heading">Mağaza fire oranı</p>
-                    <p class="title is-4 has-text-danger">@FormatRate(detail.StoreWasteRate)</p>
-                </div>
-            </div>
-            <div class="column is-one-quarter">
-                <div class="box">
-                    <p class="heading">Ortalamadan fazla kayıp</p>
-                    <p class="title is-4 has-text-danger">%@detail.DeviationPercent.ToString("N0")</p>
-                </div>
-            </div>
+            <div class="column is-one-quarter"><div class="box"><p class="heading">Referans oranı</p><p class="title is-4">@FormatRate(detail.BenchmarkRate)</p></div></div>
+            <div class="column is-one-quarter"><div class="box"><p class="heading">Mağaza fire oranı</p><p class="title is-4 has-text-danger">@FormatRate(detail.StoreRate)</p></div></div>
+            <div class="column is-one-quarter"><div class="box"><p class="heading">Otomatik eşik</p><p class="title is-4">@FormatRate(detail.ThresholdRate)</p></div></div>
+            <div class="column is-one-quarter"><div class="box"><p class="heading">Referanstan fazla kayıp</p><p class="title is-4 has-text-danger">@FormatPercent(detail.DeviationPercent)</p></div></div>
         </div>
+
+        @if (detail.CumulativeBenchmarkRate.HasValue || detail.CumulativeStoreRate.HasValue)
+        {
+            <div class="notification is-info is-light">
+                <strong>Kümülatif karşılaştırma:</strong> referans @FormatRate(detail.CumulativeBenchmarkRate), mağaza @FormatRate(detail.CumulativeStoreRate)
+            </div>
+        }
 
         <div class="columns is-variable is-5">
             <div class="column is-two-thirds">
@@ -112,31 +117,26 @@
 
                 @if (detail.CanRespond)
                 {
-                    <section class="box">
-                        <h2 class="title is-5">Mağaza mazereti</h2>
+                    <section class="box mb-5">
+                        <h2 class="title is-5">Mağaza açıklaması</h2>
                         <div class="field">
-                            <label class="label">Mazeret türü</label>
-                            <div class="control">
-                                <div class="select is-fullwidth">
-                                    <select @bind="selectedReason">
-                                        @foreach (var reason in Enum.GetValues<ExcuseReasonType>())
-                                        {
-                                            <option value="@reason">@ExcuseDisplayNames.Reason(reason)</option>
-                                        }
-                                    </select>
-                                </div>
+                            <label class="label">Neden</label>
+                            <div class="control select is-fullwidth">
+                                <select @bind="selectedReason">
+                                    @foreach (var reason in Enum.GetValues<ExcuseReasonType>())
+                                    {
+                                        <option value="@reason">@ExcuseDisplayNames.Reason(reason)</option>
+                                    }
+                                </select>
                             </div>
                         </div>
                         <div class="field">
                             <label class="label">Açıklama</label>
-                            <div class="control">
-                                <textarea class="textarea" rows="5" maxlength="2000" placeholder="Fire sapmasının nedenini ve yapılan kontrolü açıklayın." @bind="responseMessage"></textarea>
-                            </div>
+                            <div class="control"><textarea class="textarea" rows="5" maxlength="2000" placeholder="Fire sapmasının nedenini ve yapılan kontrolü açıklayın." @bind="responseMessage"></textarea></div>
                             <p class="help">En az 10 karakter.</p>
                         </div>
                         <button class="button is-primary" type="button" disabled="@isSaving" @onclick="SubmitResponseAsync">
-                            <span class="icon"><i class="fas fa-paper-plane"></i></span>
-                            <span>Mazereti gönder</span>
+                            <span class="icon"><i class="fas fa-paper-plane"></i></span><span>Mazereti gönder</span>
                         </button>
                     </section>
                 }
@@ -147,56 +147,50 @@
                         <h2 class="title is-5">Yönetici değerlendirmesi</h2>
                         <div class="field">
                             <label class="label">Değerlendirme notu</label>
-                            <div class="control">
-                                <textarea class="textarea" rows="4" maxlength="2000" placeholder="Onay notu isteğe bağlı, revizyon nedeni zorunludur." @bind="reviewMessage"></textarea>
-                            </div>
+                            <div class="control"><textarea class="textarea" rows="4" maxlength="2000" placeholder="Onay notu isteğe bağlı, revizyon nedeni zorunludur." @bind="reviewMessage"></textarea></div>
                         </div>
                         <div class="buttons">
-                            <button class="button is-success" type="button" disabled="@isSaving" @onclick="ApproveAsync">
-                                <span class="icon"><i class="fas fa-check"></i></span>
-                                <span>Onayla</span>
-                            </button>
-                            <button class="button is-warning" type="button" disabled="@isSaving" @onclick="RequestRevisionAsync">
-                                <span class="icon"><i class="fas fa-rotate-left"></i></span>
-                                <span>Revizyon iste</span>
-                            </button>
+                            <button class="button is-success" type="button" disabled="@isSaving" @onclick="ApproveAsync"><span class="icon"><i class="fas fa-check"></i></span><span>Onayla</span></button>
+                            <button class="button is-warning" type="button" disabled="@isSaving" @onclick="RequestRevisionAsync"><span class="icon"><i class="fas fa-rotate-left"></i></span><span>Revizyon iste</span></button>
                         </div>
                     </section>
                 }
             </div>
 
             <div class="column">
-                <section class="box">
-                    <h2 class="title is-5">En yüksek fireli ürünler</h2>
-                    <p class="is-size-7 has-text-grey mb-4">Mağazanın bu kategori ve aylık rapordaki en yüksek negatif fire tutarları.</p>
-                    @if (detail.TopProducts.Count == 0)
-                    {
-                        <p class="has-text-grey">Ürün detayı bulunamadı.</p>
-                    }
-                    else
-                    {
-                        <div class="table-container">
-                            <table class="table is-fullwidth is-size-7">
-                                <thead>
-                                    <tr><th>Ürün</th><th class="has-text-right">Oran</th><th class="has-text-right">Tutar</th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var product in detail.TopProducts)
-                                    {
-                                        <tr>
-                                            <td>
-                                                <p>@(product.StockName ?? "–")</p>
-                                                <p class="has-text-grey">@(product.StockCode ?? "–")</p>
-                                            </td>
-                                            <td class="has-text-right">@FormatNullableRate(product.WasteRate)</td>
-                                            <td class="has-text-right">@FormatAmount(product.WasteAmount)</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                </section>
+                @if (detail.TopCategories.Count > 0)
+                {
+                    <section class="box mb-5">
+                        <h2 class="title is-5">En yüksek fireli alt kategoriler</h2>
+                        <p class="is-size-7 has-text-grey mb-4">Mağazanın aylık rapordaki en yüksek negatif fire tutarları.</p>
+                        <div class="table-container"><table class="table is-fullwidth is-size-7">
+                            <thead><tr><th>Kategori</th><th class="has-text-right">Oran</th><th class="has-text-right">Tutar</th></tr></thead>
+                            <tbody>
+                                @foreach (var category in detail.TopCategories)
+                                {
+                                    <tr><td><p>@(category.CategoryName ?? "–")</p><p class="has-text-grey">@(category.CategoryCode ?? "–")</p></td><td class="has-text-right">@FormatRate(category.WasteRate)</td><td class="has-text-right">@FormatAmount(category.WasteAmount)</td></tr>
+                                }
+                            </tbody>
+                        </table></div>
+                    </section>
+                }
+
+                @if (detail.TopProducts.Count > 0)
+                {
+                    <section class="box">
+                        <h2 class="title is-5">En yüksek fireli ürünler</h2>
+                        <p class="is-size-7 has-text-grey mb-4">Hedef kırılımındaki en yüksek negatif fire tutarları.</p>
+                        <div class="table-container"><table class="table is-fullwidth is-size-7">
+                            <thead><tr><th>Ürün</th><th class="has-text-right">Oran</th><th class="has-text-right">Tutar</th></tr></thead>
+                            <tbody>
+                                @foreach (var product in detail.TopProducts)
+                                {
+                                    <tr><td><p>@(product.StockName ?? "–")</p><p class="has-text-grey">@(product.StockCode ?? "–")</p></td><td class="has-text-right">@FormatRate(product.WasteRate)</td><td class="has-text-right">@FormatAmount(product.WasteAmount)</td></tr>
+                                }
+                            </tbody>
+                        </table></div>
+                    </section>
+                }
             </div>
         </div>
     }
@@ -243,12 +237,12 @@
     }
 
     private async Task ApproveAsync() => await ExecuteAsync(
-            () => ExcuseService.ReviewAsync(ExcuseId, true, reviewMessage, currentUser, cancellationTokenSource.Token),
-            "Mazeret onaylandı.");
+        () => ExcuseService.ReviewAsync(ExcuseId, true, reviewMessage, currentUser, cancellationTokenSource.Token),
+        "Mazeret onaylandı.");
 
     private async Task RequestRevisionAsync() => await ExecuteAsync(
-            () => ExcuseService.ReviewAsync(ExcuseId, false, reviewMessage, currentUser, cancellationTokenSource.Token),
-            "Mağazadan revizyon istendi.");
+        () => ExcuseService.ReviewAsync(ExcuseId, false, reviewMessage, currentUser, cancellationTokenSource.Token),
+        "Mağazadan revizyon istendi.");
 
     private async Task<bool> ExecuteAsync(Func<Task> action, string success)
     {
@@ -269,6 +263,12 @@
         finally { isSaving = false; }
     }
 
+    private static string DisplayTarget(ExcuseDetailResult value)
+    {
+        var parts = new[] { value.TargetName, value.TargetCode }.Where(item => !string.IsNullOrWhiteSpace(item));
+        return string.Join(" · ", parts);
+    }
+
     private static string EntryCss(ExcuseEntryType type) => type switch
     {
         ExcuseEntryType.StoreResponse => "is-info",
@@ -277,8 +277,8 @@
         _ => string.Empty
     };
 
-    private static string FormatRate(decimal value) => $"%{value:N2}";
-    private static string FormatNullableRate(decimal? value) => value.HasValue ? FormatRate(value.Value) : "–";
+    private static string FormatRate(decimal? value) => value.HasValue ? $"%{value.Value:N2}" : "–";
+    private static string FormatPercent(decimal? value) => value.HasValue ? $"%{value.Value:N0}" : "–";
     private static string FormatAmount(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "–";
 
     public ValueTask DisposeAsync()

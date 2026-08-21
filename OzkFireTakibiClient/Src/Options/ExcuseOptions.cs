@@ -8,7 +8,7 @@ public sealed class ExcuseOptions
     public const string SectionName = "Excuse";
 
     /// <summary>
-    /// Her kategorinin aylık fire büyüklüğüne uygulanacak çarpan. 1.50 değeri yüzde 50 fazlasıdır.
+    /// Aylık rapor genel fire büyüklüğüne uygulanacak çarpan. 1.50 değeri yüzde 50 fazlasıdır.
     /// </summary>
     public decimal ThresholdMultiplier { get; set; } = 1.50m;
 

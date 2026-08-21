@@ -10,7 +10,7 @@
         <div class="level-left">
             <div>
                 <h1 class="title is-3 mb-2">Mazeretler</h1>
-                <p class="subtitle is-6 has-text-grey">Kategori aylık fire büyüklüğünü yüzde 50 aşan mağaza kayıtları</p>
+                <p class="subtitle is-6 has-text-grey">Rapor geneli için otomatik açılan ve alt kategori için yönetici tarafından istenen mağaza açıklamaları</p>
             </div>
         </div>
         <div class="level-right">
@@ -75,7 +75,7 @@
                 <div class="column is-half">
                     <div class="field has-addons">
                         <div class="control is-expanded">
-                            <input class="input" type="search" placeholder="Mağaza, kategori adı veya kodu" @bind="searchText" @bind:event="oninput" @onkeydown="HandleSearchKeyAsync" />
+                            <input class="input" type="search" placeholder="Başlık, mağaza, hedef adı veya kodu" @bind="searchText" @bind:event="oninput" @onkeydown="HandleSearchKeyAsync" />
                         </div>
                         <div class="control">
                             <button class="button is-primary" type="button" disabled="@isLoading" @onclick="ApplyFiltersAsync">Ara</button>
@@ -107,10 +107,10 @@
                             <tr>
                                 <th>Durum</th>
                                 <th>Dönem</th>
-                                <th>Mağaza</th>
-                                <th>Kategori</th>
-                                <th class="has-text-right">Kategori ort.</th>
-                                <th class="has-text-right">Mağaza</th>
+                                <th>Tür</th>
+                                <th>Talep</th>
+                                <th class="has-text-right">Referans</th>
+                                <th class="has-text-right">Mağaza oranı</th>
                                 <th class="has-text-right">Sapma</th>
                                 <th></th>
                             </tr>
@@ -125,16 +125,20 @@
                                         <p class="is-size-7 has-text-grey">@ReportDisplayNames.Scope(item.Scope)</p>
                                     </td>
                                     <td>
-                                        <p class="has-text-weight-semibold">@item.StoreName</p>
-                                        <p class="is-size-7 has-text-grey">Depo No: @item.StoreNumber</p>
+                                        <span class="tag is-light">@ExcuseDisplayNames.Source(item.Source)</span>
+                                        <span class="tag is-info is-light">@ExcuseDisplayNames.Target(item.TargetRowType)</span>
                                     </td>
                                     <td>
-                                        <p>@item.CategoryName</p>
-                                        <p class="is-size-7 has-text-grey">@item.CategoryCode</p>
+                                        <p class="has-text-weight-semibold">@item.Title</p>
+                                        <p class="is-size-7 has-text-grey">@item.StoreName · Depo No: @item.StoreNumber</p>
+                                        @if (!string.IsNullOrWhiteSpace(item.TargetName) || !string.IsNullOrWhiteSpace(item.TargetCode))
+                                        {
+                                            <p class="is-size-7 has-text-grey">@DisplayTarget(item)</p>
+                                        }
                                     </td>
-                                    <td class="has-text-right">@FormatRate(item.CategoryAverageWasteRate)</td>
-                                    <td class="has-text-right has-text-danger has-text-weight-semibold">@FormatRate(item.StoreWasteRate)</td>
-                                    <td class="has-text-right">%@item.DeviationPercent.ToString("N0")</td>
+                                    <td class="has-text-right">@FormatRate(item.BenchmarkRate)</td>
+                                    <td class="has-text-right has-text-danger has-text-weight-semibold">@FormatRate(item.StoreRate)</td>
+                                    <td class="has-text-right">@FormatPercent(item.DeviationPercent)</td>
                                     <td class="has-text-right">
                                         <NavLink class="button is-small is-info is-light" href="@($"/mazeretler/{item.Id}")">Detay</NavLink>
                                     </td>
@@ -204,7 +208,14 @@
         if (args.Key == "Enter") await ApplyFiltersAsync();
     }
 
-    private static string FormatRate(decimal value) => $"%{value:N2}";
+    private static string FormatRate(decimal? value) => value.HasValue ? $"%{value.Value:N2}" : "–";
+    private static string FormatPercent(decimal? value) => value.HasValue ? $"%{value.Value:N0}" : "–";
+    private static string DisplayTarget(ExcuseListItem item)
+    {
+        var parts = new[] { item.TargetName, item.TargetCode }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        return string.Join(" · ", parts);
+    }
 
     public ValueTask DisposeAsync()
     {

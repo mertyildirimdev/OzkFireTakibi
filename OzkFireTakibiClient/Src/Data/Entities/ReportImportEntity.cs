@@ -100,10 +100,6 @@ public class ReportImportEntity : BaseEntity<long>
     /// </summary>
     public ICollection<ReportRowEntity> Rows { get; set; } = new List<ReportRowEntity>();
 
-    /// <summary>
-    /// Bu aylık rapordan otomatik üretilen mazeret talepleri.
-    /// </summary>
-    public ICollection<ExcuseRequestEntity> ExcuseRequests { get; set; } = new List<ExcuseRequestEntity>();
 }
 
 /// <summary>

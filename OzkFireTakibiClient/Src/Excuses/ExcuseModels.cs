@@ -22,15 +22,19 @@ public sealed class ExcuseListResult
 public sealed class ExcuseListItem
 {
     public required long Id { get; init; }
+    public required string Title { get; init; }
+    public required ExcuseSource Source { get; init; }
+    public required ReportRowType TargetRowType { get; init; }
     public required ReportScope Scope { get; init; }
     public required DateOnly PeriodEndDate { get; init; }
     public required int StoreNumber { get; init; }
     public required string StoreName { get; init; }
-    public required string CategoryCode { get; init; }
-    public required string CategoryName { get; init; }
-    public required decimal CategoryAverageWasteRate { get; init; }
-    public required decimal StoreWasteRate { get; init; }
-    public required decimal DeviationPercent { get; init; }
+    public string? TargetCode { get; init; }
+    public string? TargetName { get; init; }
+    public decimal? BenchmarkRate { get; init; }
+    public decimal? StoreRate { get; init; }
+    public decimal? ThresholdRate { get; init; }
+    public decimal? DeviationPercent { get; init; }
     public required ExcuseStatus Status { get; init; }
     public required DateTime CreatedAtUtc { get; init; }
 }
@@ -39,19 +43,27 @@ public sealed class ExcuseDetailResult
 {
     public required long Id { get; init; }
     public required long ReportImportId { get; init; }
+    public required string Title { get; init; }
+    public required ExcuseSource Source { get; init; }
+    public required ReportRowType TargetRowType { get; init; }
     public required ReportScope Scope { get; init; }
     public required DateOnly StartDate { get; init; }
     public required DateOnly EndDate { get; init; }
     public required int StoreNumber { get; init; }
     public required string StoreName { get; init; }
-    public required string CategoryCode { get; init; }
-    public required string CategoryName { get; init; }
-    public required decimal CategoryAverageWasteRate { get; init; }
-    public required decimal StoreWasteRate { get; init; }
-    public required decimal ThresholdWasteRate { get; init; }
-    public required decimal DeviationPercent { get; init; }
+    public string? TargetCode { get; init; }
+    public string? TargetName { get; init; }
+    public string? RequestNote { get; init; }
+    public string? RequestedBy { get; init; }
+    public decimal? BenchmarkRate { get; init; }
+    public decimal? StoreRate { get; init; }
+    public decimal? ThresholdRate { get; init; }
+    public decimal? DeviationPercent { get; init; }
+    public decimal? CumulativeBenchmarkRate { get; init; }
+    public decimal? CumulativeStoreRate { get; init; }
     public required ExcuseStatus Status { get; init; }
     public required IReadOnlyList<ExcuseEntryItem> Entries { get; init; }
+    public required IReadOnlyList<ExcuseCategoryItem> TopCategories { get; init; }
     public required IReadOnlyList<ExcuseProductItem> TopProducts { get; init; }
     public required bool CanRespond { get; init; }
     public required bool CanReview { get; init; }
@@ -64,6 +76,14 @@ public sealed class ExcuseEntryItem
     public required string Message { get; init; }
     public required string CreatedBy { get; init; }
     public required DateTime CreatedAtUtc { get; init; }
+}
+
+public sealed class ExcuseCategoryItem
+{
+    public string? CategoryCode { get; init; }
+    public string? CategoryName { get; init; }
+    public decimal? WasteRate { get; init; }
+    public decimal? WasteAmount { get; init; }
 }
 
 public sealed class ExcuseProductItem
@@ -100,6 +120,21 @@ public static class ExcuseDisplayNames
         ExcuseStatus.RevisionRequested => "is-warning is-light",
         ExcuseStatus.Approved => "is-success is-light",
         _ => "is-light"
+    };
+
+    public static string Source(ExcuseSource source) => source switch
+    {
+        ExcuseSource.Automatic => "Otomatik",
+        ExcuseSource.Manual => "Manuel",
+        _ => source.ToString()
+    };
+
+    public static string Target(ReportRowType rowType) => rowType switch
+    {
+        ReportRowType.StoreSummary => "Rapor geneli",
+        ReportRowType.StoreCategory => "Alt kategori",
+        ReportRowType.StoreProduct => "Ürün",
+        _ => rowType.ToString()
     };
 
     public static string Reason(ExcuseReasonType reason) => reason switch

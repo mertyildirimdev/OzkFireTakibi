@@ -3,11 +3,12 @@ using Microsoft.Extensions.Options;
 using OzkFireTakibiClient.Src.Data;
 using OzkFireTakibiClient.Src.Data.Entities;
 using OzkFireTakibiClient.Src.Options;
+using OzkFireTakibiClient.Src.ReportImports;
 
 namespace OzkFireTakibiClient.Src.Services;
 
 /// <summary>
-/// Aktif aylık rapordaki tüm kategoriler için mağaza × kategori mazeretlerini transaction içinde üretir.
+/// Aylık rapor genelini mağaza özetleriyle karşılaştırarak mağaza başına tek otomatik mazeret üretir.
 /// </summary>
 public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
 {
@@ -33,8 +34,8 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
 
         var olderRequests = await dbContext.ExcuseRequests
             .Where(request =>
-                request.ReportImportId != monthlyImport.Id &&
-                request.ReportImport.ReportPeriodId == monthlyImport.ReportPeriodId &&
+                request.ReportRow.ReportImportId != monthlyImport.Id &&
+                request.ReportRow.ReportImport.ReportPeriodId == monthlyImport.ReportPeriodId &&
                 request.Status != ExcuseStatus.Superseded)
             .ToArrayAsync(cancellationToken);
 
@@ -46,24 +47,22 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
             request.UpdatedAt = now;
         }
 
-        var existingKeys = await dbContext.ExcuseRequests
-            .Where(request => request.ReportImportId == monthlyImport.Id)
-            .Select(request => request.StoreNumber + "|" + request.CategoryCode)
+        var existingRowIds = await dbContext.ExcuseRequests
+            .Where(request => request.ReportRow.ReportImportId == monthlyImport.Id)
+            .Select(request => request.ReportRowId)
             .ToHashSetAsync(cancellationToken);
 
-        var categoryRows = await dbContext.ReportRows
+        var generalRow = await dbContext.ReportRows
             .AsNoTracking()
-            .Where(row =>
+            .SingleOrDefaultAsync(row =>
                 row.ReportImportId == monthlyImport.Id &&
-                row.RowType == ReportRowType.CategorySummary &&
-                row.CategoryCode != null &&
-                row.WasteRate != null)
-            .ToArrayAsync(cancellationToken);
+                row.RowType == ReportRowType.General,
+                cancellationToken);
 
-        var benchmarks = categoryRows.ToDictionary(
-            row => row.CategoryCode!.Trim(),
-            row => row,
-            StringComparer.OrdinalIgnoreCase);
+        if (generalRow?.WasteRate is not { } reportRate)
+        {
+            return 0;
+        }
 
         var eligibleStores = await dbContext.Stores
             .AsNoTracking()
@@ -71,61 +70,44 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
             .Select(store => store.Id)
             .ToHashSetAsync(cancellationToken);
 
-        var storeCategoryRows = await dbContext.ReportRows
+        var storeRows = await dbContext.ReportRows
             .AsNoTracking()
             .Where(row =>
                 row.ReportImportId == monthlyImport.Id &&
-                row.RowType == ReportRowType.StoreCategory &&
+                row.RowType == ReportRowType.StoreSummary &&
                 row.StoreNumber != null &&
-                row.CategoryCode != null &&
                 row.WasteRate < 0m)
             .ToArrayAsync(cancellationToken);
 
         var generated = new List<ExcuseRequestEntity>();
+        var reportMagnitude = Math.Abs(reportRate);
+        var thresholdRate = -(reportMagnitude * _options.ThresholdMultiplier);
 
-        foreach (var row in storeCategoryRows)
+        foreach (var row in storeRows)
         {
             var storeNumber = row.StoreNumber!.Value;
-            var categoryCode = row.CategoryCode!.Trim();
             if (!eligibleStores.Contains(storeNumber) ||
-                !benchmarks.TryGetValue(categoryCode, out var categoryRow) ||
-                categoryRow.WasteRate is not { } categoryRate)
+                existingRowIds.Contains(row.Id))
             {
                 continue;
             }
 
-            var categoryMagnitude = Math.Abs(categoryRate);
-            var thresholdRate = -(categoryMagnitude * _options.ThresholdMultiplier);
             if (row.WasteRate is not { } storeRate || storeRate > thresholdRate)
-            {
-                continue;
-            }
-
-            var naturalKey = $"{storeNumber}|{categoryCode}";
-            if (existingKeys.Contains(naturalKey))
             {
                 continue;
             }
 
             generated.Add(new ExcuseRequestEntity
             {
-                ReportImportId = monthlyImport.Id,
                 ReportRowId = row.Id,
-                StoreNumber = storeNumber,
-                StoreName = row.StoreName ?? storeNumber.ToString(),
-                CategoryCode = categoryCode,
-                CategoryName = row.CategoryName ?? categoryRow.CategoryName ?? categoryCode,
-                CategoryAverageWasteRate = categoryRate,
-                StoreWasteRate = storeRate,
-                ThresholdWasteRate = thresholdRate,
-                DeviationPercent = categoryMagnitude == 0m
-                    ? 100m
-                    : ((Math.Abs(storeRate) / categoryMagnitude) - 1m) * 100m,
+                Source = ExcuseSource.Automatic,
+                Title = $"{ReportDisplayNames.Scope(monthlyImport.Scope)} — {row.StoreName ?? storeNumber.ToString()}",
+                ThresholdRate = thresholdRate,
                 Status = ExcuseStatus.Open,
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            existingKeys.Add(naturalKey);
+            existingRowIds.Add(row.Id);
         }
 
         await dbContext.ExcuseRequests.AddRangeAsync(generated, cancellationToken);
@@ -141,7 +123,7 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
     {
         var requests = await dbContext.ExcuseRequests
             .Where(request =>
-                request.ReportImportId == restoredReportImportId &&
+                request.ReportRow.ReportImportId == restoredReportImportId &&
                 request.Status == ExcuseStatus.Superseded &&
                 request.SupersededByReportImportId == deletedReportImportId)
             .ToArrayAsync(cancellationToken);

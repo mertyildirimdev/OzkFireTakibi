@@ -190,6 +190,11 @@ public class ReportRowEntity : BaseEntity<long>
     /// </summary>
     public ReportImportEntity ReportImport { get; set; } = default!;
 
+    /// <summary>
+    /// Bu rapor satırı için açılan mazeret talebi.
+    /// </summary>
+    public ExcuseRequestEntity? ExcuseRequest { get; set; }
+
 }
 
 /// <summary>

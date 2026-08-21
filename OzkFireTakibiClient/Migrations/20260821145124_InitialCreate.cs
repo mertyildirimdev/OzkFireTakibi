@@ -108,41 +108,6 @@ namespace OzkFireTakibiClient.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "excuse_requests",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReportImportId = table.Column<long>(type: "bigint", nullable: false),
-                    ReportRowId = table.Column<long>(type: "bigint", nullable: false),
-                    StoreNumber = table.Column<int>(type: "int", nullable: false),
-                    StoreName = table.Column<string>(type: "nvarchar(160)", maxLength: 160, nullable: false),
-                    CategoryCode = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
-                    CategoryName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    CategoryAverageWasteRate = table.Column<decimal>(type: "decimal(20,6)", precision: 20, scale: 6, nullable: false),
-                    StoreWasteRate = table.Column<decimal>(type: "decimal(20,6)", precision: 20, scale: 6, nullable: false),
-                    ThresholdWasteRate = table.Column<decimal>(type: "decimal(20,6)", precision: 20, scale: 6, nullable: false),
-                    DeviationPercent = table.Column<decimal>(type: "decimal(20,6)", precision: 20, scale: 6, nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    StatusBeforeSuperseded = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    SupersededByReportImportId = table.Column<long>(type: "bigint", nullable: true),
-                    RespondedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ReviewedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_excuse_requests", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_excuse_requests_report_imports_ReportImportId",
-                        column: x => x.ReportImportId,
-                        principalTable: "report_imports",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "report_rows",
                 columns: table => new
                 {
@@ -199,6 +164,43 @@ namespace OzkFireTakibiClient.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "excuse_requests",
+                columns: table => new
+                {
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ReportRowId = table.Column<long>(type: "bigint", nullable: false),
+                    Source = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
+                    RequestNote = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RequestedByUserId = table.Column<int>(type: "int", nullable: true),
+                    ThresholdRate = table.Column<decimal>(type: "decimal(20,6)", precision: 20, scale: 6, nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    StatusBeforeSuperseded = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    SupersededByReportImportId = table.Column<long>(type: "bigint", nullable: true),
+                    RespondedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ReviewedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_excuse_requests", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_excuse_requests_report_rows_ReportRowId",
+                        column: x => x.ReportRowId,
+                        principalTable: "report_rows",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_excuse_requests_users_RequestedByUserId",
+                        column: x => x.RequestedByUserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "excuse_entries",
                 columns: table => new
                 {
@@ -249,20 +251,20 @@ namespace OzkFireTakibiClient.Migrations
                 columns: new[] { "ExcuseRequestId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_excuse_requests_ReportImportId_StoreNumber_CategoryCode",
+                name: "IX_excuse_requests_ReportRowId",
                 table: "excuse_requests",
-                columns: new[] { "ReportImportId", "StoreNumber", "CategoryCode" },
+                column: "ReportRowId",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_excuse_requests_RequestedByUserId",
+                table: "excuse_requests",
+                column: "RequestedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_excuse_requests_Status_CreatedAt",
                 table: "excuse_requests",
                 columns: new[] { "Status", "CreatedAt" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_excuse_requests_StoreNumber_Status",
-                table: "excuse_requests",
-                columns: new[] { "StoreNumber", "Status" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_report_imports_FileHash",
@@ -287,6 +289,11 @@ namespace OzkFireTakibiClient.Migrations
                 table: "report_periods",
                 columns: new[] { "Scope", "EndDate" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_report_rows_Depo No_RowType",
+                table: "report_rows",
+                columns: new[] { "Depo No", "RowType" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_report_rows_ReportImportId_Depo No",
@@ -327,13 +334,13 @@ namespace OzkFireTakibiClient.Migrations
                 name: "excuse_entries");
 
             migrationBuilder.DropTable(
-                name: "report_rows");
-
-            migrationBuilder.DropTable(
                 name: "stores");
 
             migrationBuilder.DropTable(
                 name: "excuse_requests");
+
+            migrationBuilder.DropTable(
+                name: "report_rows");
 
             migrationBuilder.DropTable(
                 name: "report_imports");
