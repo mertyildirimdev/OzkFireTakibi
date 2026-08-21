@@ -189,6 +189,7 @@ public class ReportRowEntity : BaseEntity<long>
     /// Bağlı olduğu rapor içe aktarım varlığı navigasyonu
     /// </summary>
     public ReportImportEntity ReportImport { get; set; } = default!;
+
 }
 
 /// <summary>
@@ -226,4 +227,3 @@ public enum ReportRowType
     /// </summary>
     StoreProduct
 }
-

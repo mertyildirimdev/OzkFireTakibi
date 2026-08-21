@@ -1,0 +1,215 @@
+@page "/mazeretler"
+@inherits AuthRequiredComponent
+@implements IAsyncDisposable
+@inject ExcuseService ExcuseService
+
+<PageTitle>Mazeretler</PageTitle>
+
+<div class="container">
+    <div class="level mb-5">
+        <div class="level-left">
+            <div>
+                <h1 class="title is-3 mb-2">Mazeretler</h1>
+                <p class="subtitle is-6 has-text-grey">Kategori aylık fire büyüklüğünü yüzde 50 aşan mağaza kayıtları</p>
+            </div>
+        </div>
+        <div class="level-right">
+            <AuthorizeView Policy="@ReportPolicies.CanManageExcuseStores">
+                <Authorized>
+                    <NavLink class="button is-light" href="/mazeretler/magazalar">
+                        <span class="icon"><i class="fas fa-store"></i></span>
+                        <span>Mağaza kapsamı</span>
+                    </NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="notification is-danger is-light">@errorMessage</div>
+    }
+
+    @if (isLoading && result is null)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (result is not null)
+    {
+        @if (result.IsStoreUser && result.StoreNumber is null && string.IsNullOrWhiteSpace(result.StoreName))
+        {
+            <div class="notification is-warning is-light">
+                Kullanıcınıza bir <strong>Depo No</strong> atanmadığı için mağazaya özel mazeretler gösterilemiyor.
+            </div>
+        }
+
+        <div class="columns is-multiline mb-4">
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Açık</p>
+                    <p class="title is-4 has-text-danger">@result.OpenCount</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Yanıtlandı</p>
+                    <p class="title is-4 has-text-info">@result.AnsweredCount</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Revizyon istendi</p>
+                    <p class="title is-4 has-text-warning">@result.RevisionRequestedCount</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Onaylandı</p>
+                    <p class="title is-4 has-text-success">@result.ApprovedCount</p>
+                </div>
+            </div>
+        </div>
+
+        <section class="box">
+            <div class="columns is-vcentered">
+                <div class="column is-half">
+                    <div class="field has-addons">
+                        <div class="control is-expanded">
+                            <input class="input" type="search" placeholder="Mağaza, kategori adı veya kodu" @bind="searchText" @bind:event="oninput" @onkeydown="HandleSearchKeyAsync" />
+                        </div>
+                        <div class="control">
+                            <button class="button is-primary" type="button" disabled="@isLoading" @onclick="ApplyFiltersAsync">Ara</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="select is-fullwidth">
+                        <select value="@StatusValue" @onchange="ChangeStatusAsync">
+                            <option value="">Tüm aktif durumlar</option>
+                            @foreach (var status in Enum.GetValues<ExcuseStatus>())
+                            {
+                                <option value="@status">@ExcuseDisplayNames.Status(status)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            @if (result.Items.Count == 0)
+            {
+                <div class="notification is-light has-text-centered mt-4">Seçilen filtrelere uygun mazeret talebi bulunamadı.</div>
+            }
+            else
+            {
+                <div class="table-container mt-4">
+                    <table class="table is-fullwidth is-hoverable">
+                        <thead>
+                            <tr>
+                                <th>Durum</th>
+                                <th>Dönem</th>
+                                <th>Mağaza</th>
+                                <th>Kategori</th>
+                                <th class="has-text-right">Kategori ort.</th>
+                                <th class="has-text-right">Mağaza</th>
+                                <th class="has-text-right">Sapma</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in result.Items)
+                            {
+                                <tr>
+                                    <td><span class="tag @ExcuseDisplayNames.StatusCss(item.Status)">@ExcuseDisplayNames.Status(item.Status)</span></td>
+                                    <td>
+                                        <p>@item.PeriodEndDate.ToString("MMMM yyyy")</p>
+                                        <p class="is-size-7 has-text-grey">@ReportDisplayNames.Scope(item.Scope)</p>
+                                    </td>
+                                    <td>
+                                        <p class="has-text-weight-semibold">@item.StoreName</p>
+                                        <p class="is-size-7 has-text-grey">Depo No: @item.StoreNumber</p>
+                                    </td>
+                                    <td>
+                                        <p>@item.CategoryName</p>
+                                        <p class="is-size-7 has-text-grey">@item.CategoryCode</p>
+                                    </td>
+                                    <td class="has-text-right">@FormatRate(item.CategoryAverageWasteRate)</td>
+                                    <td class="has-text-right has-text-danger has-text-weight-semibold">@FormatRate(item.StoreWasteRate)</td>
+                                    <td class="has-text-right">%@item.DeviationPercent.ToString("N0")</td>
+                                    <td class="has-text-right">
+                                        <NavLink class="button is-small is-info is-light" href="@($"/mazeretler/{item.Id}")">Detay</NavLink>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="pagination is-centered mt-5" role="navigation" aria-label="Sayfalama">
+                    <button class="pagination-previous" disabled="@(isLoading || result.PageNumber <= 1)" @onclick="() => LoadAsync(result.PageNumber - 1)">Önceki</button>
+                    <button class="pagination-next" disabled="@(isLoading || result.PageNumber >= result.TotalPages)" @onclick="() => LoadAsync(result.PageNumber + 1)">Sonraki</button>
+                    <ul class="pagination-list">
+                        <li><span class="pagination-link is-current">@result.PageNumber / @result.TotalPages</span></li>
+                    </ul>
+                </nav>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private ExcuseListResult? result;
+    private ExcuseStatus? selectedStatus;
+    private string? searchText;
+    private string? errorMessage;
+    private bool isLoading;
+
+    private string StatusValue => selectedStatus?.ToString() ?? string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        if (currentUser.Identity?.IsAuthenticated == true)
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        if (isLoading) return;
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            result = await ExcuseService.GetListAsync(currentUser, selectedStatus, searchText, pageNumber, cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = exception.Message; }
+        finally { isLoading = false; }
+    }
+
+    private Task ApplyFiltersAsync() => LoadAsync(1);
+
+    private async Task ChangeStatusAsync(ChangeEventArgs args)
+    {
+        selectedStatus = Enum.TryParse<ExcuseStatus>(args.Value?.ToString(), out var parsed) ? parsed : null;
+        await LoadAsync(1);
+    }
+
+    private async Task HandleSearchKeyAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter") await ApplyFiltersAsync();
+    }
+
+    private static string FormatRate(decimal value) => $"%{value:N2}";
+
+    public ValueTask DisposeAsync()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

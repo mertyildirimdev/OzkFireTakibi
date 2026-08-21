@@ -178,6 +178,8 @@ public sealed class ReportPairImportResult
     public required long CumulativeImportId { get; init; }
     public required bool MonthlyReportChanged { get; init; }
     public required bool CumulativeReportChanged { get; init; }
+
+    public required int GeneratedExcuseCount { get; init; }
 }
 
 /// <summary>
@@ -382,4 +384,3 @@ public static class ReportDisplayNames
         _ => rowType.ToString()
     };
 }
-

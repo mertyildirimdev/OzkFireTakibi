@@ -166,6 +166,11 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
             claims.Add(new Claim("StoreName", user.StoreName));
         }
 
+        if (user.StoreNumber.HasValue)
+        {
+            claims.Add(new Claim("StoreNumber", user.StoreNumber.Value.ToString()));
+        }
+
         return new ClaimsIdentity(claims, "CustomAuth");
     }
 }

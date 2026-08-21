@@ -1,54 +1,31 @@
 @*
-    Navigasyon Menü Öğeleri Bileşeni (NavbarItems.razor)
-    Sol menü ve mobil menüde ortak olarak kullanılan navigasyon bağlantılarını listeler.
+    Masaüstü ve mobil üst navigasyonda ortak kullanılan bağlantılar.
 *@
 
-<div class="p-4">
-    <aside class="menu">
-        <p class="menu-label">Genel</p>
-        <ul class="menu-list">
-            @foreach (var item in navItems)
-            {
-                <li class="mb-2">
-                    <NavLink href="@item.Url" Match="NavLinkMatch.All" ActiveClass="is-active" @onclick="HandleNavigate">
-                        <span class="icon-text">
-                            <span class="icon" aria-hidden="true">
-                                <i class="@item.Icon"></i>
-                            </span>
-                            <span>@item.Title</span>
-                        </span>
-                    </NavLink>
-                </li>
-            }
-        </ul>
-    </aside>
-</div>
+@foreach (var item in navItems)
+{
+    <NavLink class="navbar-item"
+             href="@item.Url"
+             Match="@item.Match"
+             ActiveClass="is-active has-text-primary has-text-weight-semibold"
+             @onclick="HandleNavigate">
+        <span class="icon-text">
+            <span class="icon" aria-hidden="true"><i class="@item.Icon"></i></span>
+            <span>@item.Title</span>
+        </span>
+    </NavLink>
+}
 
 @code {
-    /// <summary>
-    /// Menü öğesine tıklandığında üst bileşeni bilgilendiren olay geri çağrımı (örn: mobil menüyü kapatmak için)
-    /// </summary>
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
-    /// <summary>
-    /// Navigasyon menü bağlantı modeli
-    /// </summary>
-    private class NavItem
-    {
-        public string Title { get; set; } = default!;
-        public string Icon { get; set; } = default!;
-        public string Url { get; set; } =  default!;
-    }
-
-    /// <summary>
-    /// Menüde gösterilecek aktif bağlantıların listesi
-    /// </summary>
-    private readonly List<NavItem> navItems = new List<NavItem>
-    {
-        new NavItem { Title = "Anasayfa", Icon = "fas fa-house", Url = "" },
-        new NavItem { Title = "Raporlar", Icon = "fas fa-file-alt", Url = "/raporlar" }
-    };
+    private readonly NavItem[] navItems =
+    [
+        new("Anasayfa", "fas fa-house", "", NavLinkMatch.All),
+        new("Raporlar", "fas fa-file-alt", "/raporlar", NavLinkMatch.Prefix),
+        new("Mazeretler", "fas fa-clipboard-question", "/mazeretler", NavLinkMatch.Prefix)
+    ];
 
     private async Task HandleNavigate()
     {
@@ -57,4 +34,6 @@
             await OnNavigate.InvokeAsync();
         }
     }
+
+    private sealed record NavItem(string Title, string Icon, string Url, NavLinkMatch Match);
 }

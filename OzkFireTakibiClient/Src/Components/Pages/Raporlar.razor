@@ -554,6 +554,13 @@
                     ? "Rapor paketi kaydedildi; aylık rapor güncellendi, aktif kümülatif rapor korundu."
                     : "Rapor paketi kaydedildi; kümülatif rapor güncellendi, aktif aylık rapor korundu.";
 
+            if (result.MonthlyReportChanged)
+            {
+                successMessage += result.GeneratedExcuseCount > 0
+                    ? $" {result.GeneratedExcuseCount:N0} mağaza-kategori için otomatik mazeret açıldı."
+                    : " Otomatik mazeret eşiğini aşan mağaza-kategori bulunmadı.";
+            }
+
             ClearSelection();
             await LoadHistoryAsync();
         }

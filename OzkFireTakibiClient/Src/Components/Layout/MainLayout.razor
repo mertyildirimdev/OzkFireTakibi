@@ -1,22 +1,15 @@
 @*
-    Ana Sayfa Düzeni Bileşeni (MainLayout.razor)
-    Kenar menüsü, üst çubuk (kullanıcı bilgileri, rol etiketi ve çıkış butonu) ile ana içerik alanını birleştirir.
+    Uygulamanın responsive üst navigasyonunu ve tam genişlikte içerik alanını barındırır.
 *@
 
 @inherits LayoutComponentBase
 @inject LoginService LoginService
 
 <div class="hero is-fullheight">
-    <div class="hero-body is-align-items-stretch p-0">
-        <div class="columns is-gapless is-mobile is-flex-grow-1 mb-0">
-    <aside class="box column is-one-quarter-tablet is-one-fifth-desktop is-hidden-mobile is-radiusless p-0 mb-0" aria-label="Ana menü">
-        <NavMenu />
-    </aside>
-
-    <div class="column">
-        <nav class="navbar has-shadow" role="navigation" aria-label="Üst menü">
+    <nav class="navbar has-shadow" role="navigation" aria-label="Ana menü">
+        <div class="container is-fluid">
             <div class="navbar-brand">
-                <NavLink class="navbar-item has-text-weight-semibold is-hidden-tablet" href="">
+                <NavLink class="navbar-item has-text-weight-semibold is-size-5" href="">
                     <span class="icon-text">
                         <span class="icon has-text-primary" aria-hidden="true">
                             <i class="fas fa-fire-flame-curved"></i>
@@ -25,10 +18,10 @@
                     </span>
                 </NavLink>
 
-                <button class="navbar-burger is-hidden-tablet @(_isNavbarMenuOpen ? "is-active" : "")"
+                <button class="navbar-burger @(_isNavbarMenuOpen ? "is-active" : null)"
                         type="button"
                         aria-label="Menüyü aç veya kapat"
-                        aria-expanded="@(_isNavbarMenuOpen ? "true" : "false")"
+                        aria-expanded="@_isNavbarMenuOpen"
                         @onclick="ToggleNavbarMenu">
                     <span aria-hidden="true"></span>
                     <span aria-hidden="true"></span>
@@ -37,11 +30,9 @@
                 </button>
             </div>
 
-            <div class="navbar-menu @(_isNavbarMenuOpen ? "is-active" : "")">
-                <div class="navbar-start is-hidden-tablet">
-                    <div class="navbar-item">
-                        <NavbarItems OnNavigate="CloseNavbarMenu" />
-                    </div>
+            <div class="navbar-menu @(_isNavbarMenuOpen ? "is-active" : null)">
+                <div class="navbar-start">
+                    <NavbarItems OnNavigate="CloseNavbarMenu" />
                 </div>
 
                 <div class="navbar-end">
@@ -49,9 +40,7 @@
                         <Authorized>
                             <div class="navbar-item">
                                 <span class="icon-text has-text-grey">
-                                    <span class="icon" aria-hidden="true">
-                                        <i class="fas fa-user"></i>
-                                    </span>
+                                    <span class="icon" aria-hidden="true"><i class="fas fa-user"></i></span>
                                     <span>@context.User.Identity?.Name</span>
                                 </span>
                             </div>
@@ -59,7 +48,7 @@
                                 <span class="tag is-info is-light">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
                             </div>
                             <div class="navbar-item">
-                                <button class="button is-danger is-light is-small" @onclick="Logout">Çıkış Yap</button>
+                                <button class="button is-danger is-light is-small" type="button" @onclick="Logout">Çıkış Yap</button>
                             </div>
                         </Authorized>
                         <NotAuthorized>
@@ -70,16 +59,14 @@
                     </AuthorizeView>
                 </div>
             </div>
-        </nav>
+        </div>
+    </nav>
 
-        <main class="section">
-            <div class="container is-fluid">
+    <main class="section is-flex-grow-1">
+        <div class="container is-fluid">
             @Body
-            </div>
-        </main>
-    </div>
-</div>
-</div>
+        </div>
+    </main>
 </div>
 
 <div id="blazor-error-ui" class="notification is-danger is-light" data-nosnippet>
@@ -91,23 +78,13 @@
 @code {
     private bool _isNavbarMenuOpen;
 
-    private void ToggleNavbarMenu()
-    {
-        _isNavbarMenuOpen = !_isNavbarMenuOpen;
-    }
+    private void ToggleNavbarMenu() => _isNavbarMenuOpen = !_isNavbarMenuOpen;
 
-    private void CloseNavbarMenu()
-    {
-        _isNavbarMenuOpen = false;
-    }
+    private void CloseNavbarMenu() => _isNavbarMenuOpen = false;
 
-    /// <summary>
-    /// Kullanıcı oturumunu kapatır ve login sayfasına yönlendirir.
-    /// </summary>
     private async Task Logout()
     {
         CloseNavbarMenu();
         await LoginService.LogoutAsync();
     }
 }
-

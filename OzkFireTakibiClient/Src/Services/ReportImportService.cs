@@ -19,6 +19,7 @@ public sealed class ReportImportService(
     IDbContextFactory<AppDbContext> dbContextFactory,
     ReportImportParser parser,
     IAuthorizationService authorizationService,
+    ExcuseAutomationService excuseAutomationService,
     IOptions<ReportImportOptions> options)
 {
     private readonly ReportImportOptions _options = options.Value;
@@ -161,6 +162,15 @@ public sealed class ReportImportService(
             throw new ReportImportValidationException("Seçilen iki Excel de bu dönemin aktif raporlarıyla birebir aynı.");
         }
 
+        var generatedExcuseCount = 0;
+        if (monthlySave.Changed)
+        {
+            generatedExcuseCount = await excuseAutomationService.GenerateAsync(
+                dbContext,
+                monthlySave.ReportImport,
+                cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
 
         return new ReportPairImportResult
@@ -169,7 +179,8 @@ public sealed class ReportImportService(
             MonthlyImportId = monthlySave.ReportImport.Id,
             CumulativeImportId = cumulativeSave.ReportImport.Id,
             MonthlyReportChanged = monthlySave.Changed,
-            CumulativeReportChanged = cumulativeSave.Changed
+            CumulativeReportChanged = cumulativeSave.Changed,
+            GeneratedExcuseCount = generatedExcuseCount
         };
     }
 
@@ -446,6 +457,15 @@ public sealed class ReportImportService(
                 previousVersion.IsActive = true;
                 previousVersion.UpdatedAt = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync(cancellationToken);
+
+                if (reportImport.PeriodType == ReportPeriodType.Monthly)
+                {
+                    await excuseAutomationService.RestoreSupersededAsync(
+                        dbContext,
+                        previousVersion.Id,
+                        reportImport.Id,
+                        cancellationToken);
+                }
             }
         }
 

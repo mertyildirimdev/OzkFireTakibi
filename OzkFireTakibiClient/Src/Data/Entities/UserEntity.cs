@@ -26,6 +26,11 @@ public class UserEntity : SoftDeleteEntity<int>
     public string? StoreName { get; set; }
 
     /// <summary>
+    /// Kullanıcının bağlı olduğu mağazanın Excel'deki sabit Depo No değeri.
+    /// </summary>
+    public int? StoreNumber { get; set; }
+
+    /// <summary>
     /// Kullanıcının rolü (Admin, Moderator, Observer, User)
     /// </summary>
     public string? Role { get; set; }

@@ -14,5 +14,8 @@ public static class ReportPolicies
     /// Rapor silme yetkisi (Sadece Admin rolü)
     /// </summary>
     public const string CanDeleteReports = "CanDeleteReports";
-}
 
+    public const string CanReviewExcuses = "CanReviewExcuses";
+
+    public const string CanManageExcuseStores = "CanManageExcuseStores";
+}

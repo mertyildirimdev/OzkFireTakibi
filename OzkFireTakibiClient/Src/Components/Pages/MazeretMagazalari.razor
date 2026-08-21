@@ -1,0 +1,137 @@
+@page "/mazeretler/magazalar"
+@inherits AuthRequiredComponent
+@implements IAsyncDisposable
+@inject ExcuseService ExcuseService
+
+<PageTitle>Mazeret Mağaza Kapsamı</PageTitle>
+
+<div class="container">
+    <div class="mb-4">
+        <NavLink class="button is-small is-light" href="/mazeretler">
+            <span class="icon"><i class="fas fa-arrow-left"></i></span>
+            <span>Mazeretlere dön</span>
+        </NavLink>
+    </div>
+
+    <div class="box">
+        <h1 class="title is-3 mb-2">Mağaza kapsamı</h1>
+        <p class="subtitle is-6 has-text-grey">Otomatik mazeret üretilecek mağaza ve depoları belirleyin</p>
+
+        <div class="notification is-info is-light">
+            Değişiklikler bundan sonra yüklenecek aylık raporlarda uygulanır. Oluşturulmuş mazeret geçmişi değiştirilmez.
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="notification is-danger is-light">@errorMessage</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="notification is-success is-light">@successMessage</div>
+        }
+
+        @if (isLoading)
+        {
+            <progress class="progress is-primary" max="100">Yükleniyor</progress>
+        }
+        else if (stores.Count == 0)
+        {
+            <div class="notification is-light">Henüz rapordan alınmış mağaza bilgisi bulunmuyor.</div>
+        }
+        else
+        {
+            <div class="field">
+                <div class="control has-icons-left">
+                    <input class="input" type="search" placeholder="Mağaza veya depo ara" @bind="searchText" @bind:event="oninput" />
+                    <span class="icon is-left"><i class="fas fa-search"></i></span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table is-fullwidth is-hoverable">
+                    <thead><tr><th>Depo No</th><th>Mağaza / depo</th><th>Mazeret kapsamı</th></tr></thead>
+                    <tbody>
+                        @foreach (var store in FilteredStores)
+                        {
+                            <tr>
+                                <td>@store.StoreNumber</td>
+                                <td>@store.StoreName</td>
+                                <td>
+                                    <label class="checkbox">
+                                        <input type="checkbox"
+                                               class="mr-2"
+                                               checked="@store.IsExcuseEligible"
+                                               disabled="@isSaving"
+                                               @onchange="args => ChangeEligibilityAsync(store, args)" />
+                                        @(store.IsExcuseEligible ? "Dahil" : "Hariç")
+                                    </label>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private IReadOnlyList<ExcuseStoreItem> stores = [];
+    private string searchText = string.Empty;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading;
+    private bool isSaving;
+
+    private IEnumerable<ExcuseStoreItem> FilteredStores => string.IsNullOrWhiteSpace(searchText)
+        ? stores
+        : stores.Where(store =>
+            store.StoreName.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ||
+            store.StoreNumber.ToString().Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        if (currentUser.Identity?.IsAuthenticated == true) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try { stores = await ExcuseService.GetStoresAsync(currentUser, cancellationTokenSource.Token); }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = exception.Message; }
+        finally { isLoading = false; }
+    }
+
+    private async Task ChangeEligibilityAsync(ExcuseStoreItem store, ChangeEventArgs args)
+    {
+        if (isSaving) return;
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            var isEligible = args.Value is true || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+            await ExcuseService.SetStoreEligibilityAsync(store.StoreNumber, isEligible, currentUser, cancellationTokenSource.Token);
+            successMessage = $"{store.StoreName} mazeret kapsamı güncellendi.";
+            stores = stores.Select(item => item.StoreNumber == store.StoreNumber
+                ? new ExcuseStoreItem { StoreNumber = item.StoreNumber, StoreName = item.StoreName, IsExcuseEligible = isEligible }
+                : item).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = exception.Message; }
+        finally { isSaving = false; }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

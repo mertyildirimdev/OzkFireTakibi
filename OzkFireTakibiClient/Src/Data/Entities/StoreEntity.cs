@@ -1,0 +1,17 @@
+namespace OzkFireTakibiClient.Src.Data.Entities;
+
+/// <summary>
+/// Excel raporlarında bulunan mağaza/depo tanımını ve mazeret kapsamını temsil eder.
+/// </summary>
+public class StoreEntity : BaseEntity<int>
+{
+    /// <summary>
+    /// Excel'deki Depo Adı alanının güncel değeri.
+    /// </summary>
+    public string Name { get; set; } = default!;
+
+    /// <summary>
+    /// Bu mağaza için otomatik mazeret talebi oluşturulup oluşturulmayacağını belirtir.
+    /// </summary>
+    public bool IsExcuseEligible { get; set; } = true;
+}

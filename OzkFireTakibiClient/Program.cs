@@ -30,7 +30,7 @@ builder.Services.AddRazorComponents()
 
 // SQLite veritabanı için DbContext Factory kaydı (Blazor Server'ın eşzamanlı/scoped yaşam döngüsü için önerilen yaklaşım)
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Temel iş mantığı ve yardımcı servisleri (BaseService türevleri, parser, import servisi vb.) DI konteynerine kaydet
 builder.Services.AddBaseServices();
@@ -41,6 +41,7 @@ builder.Services.AddDataProtection()
 
 // Rapor yükleme yapılandırma seçeneklerini appsettings.json'dan bağla
 builder.Services.Configure<ReportImportOptions>(builder.Configuration.GetSection(ReportImportOptions.SectionName));
+builder.Services.Configure<ExcuseOptions>(builder.Configuration.GetSection(ExcuseOptions.SectionName));
 
 // Rapor yönetimi için rol bazlı yetkilendirme ilkelerini tanımla
 builder.Services.AddAuthorizationCore(options =>
@@ -51,6 +52,12 @@ builder.Services.AddAuthorizationCore(options =>
 
     // Rapor silme: Sadece Admin rolü yapabilir
     options.AddPolicy(ReportPolicies.CanDeleteReports, policy =>
+        policy.RequireRole(UserRole.Admin.ToString()));
+
+    options.AddPolicy(ReportPolicies.CanReviewExcuses, policy =>
+        policy.RequireRole(UserRole.Admin.ToString(), UserRole.Moderator.ToString()));
+
+    options.AddPolicy(ReportPolicies.CanManageExcuseStores, policy =>
         policy.RequireRole(UserRole.Admin.ToString()));
 });
 

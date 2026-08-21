@@ -1,0 +1,290 @@
+@page "/mazeretler/{ExcuseId:long}"
+@inherits AuthRequiredComponent
+@implements IAsyncDisposable
+@inject ExcuseService ExcuseService
+
+<PageTitle>Mazeret Detayı</PageTitle>
+
+<div class="container">
+    <div class="mb-4">
+        <NavLink class="button is-small is-light" href="/mazeretler">
+            <span class="icon"><i class="fas fa-arrow-left"></i></span>
+            <span>Mazeretlere dön</span>
+        </NavLink>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="notification is-danger is-light">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="notification is-success is-light">@successMessage</div>
+    }
+
+    @if (isLoading && detail is null)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (detail is not null)
+    {
+        <div class="level mb-5">
+            <div class="level-left">
+                <div>
+                    <div class="is-flex is-align-items-center mb-2">
+                        <h1 class="title is-3 mb-0 mr-3">@detail.StoreName</h1>
+                        <span class="tag @ExcuseDisplayNames.StatusCss(detail.Status)">@ExcuseDisplayNames.Status(detail.Status)</span>
+                    </div>
+                    <p class="subtitle is-6 has-text-grey">
+                        @detail.CategoryName · @detail.CategoryCode · @detail.StartDate.ToString("dd.MM.yyyy") – @detail.EndDate.ToString("dd.MM.yyyy")
+                    </p>
+                </div>
+            </div>
+            <div class="level-right">
+                <NavLink class="button is-info is-light" href="@($"/raporlar/{detail.ReportImportId}")">
+                    <span class="icon"><i class="fas fa-file-lines"></i></span>
+                    <span>Kaynak rapor</span>
+                </NavLink>
+            </div>
+        </div>
+
+        @if (detail.Status == ExcuseStatus.Superseded)
+        {
+            <div class="notification is-warning is-light">Bu talep daha yeni bir kesinleşen rapor yüklendiği için geçersiz kaldı. Geçmiş kayıt yalnızca denetim amacıyla gösteriliyor.</div>
+        }
+
+        <div class="columns is-multiline">
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Kategori aylık oranı</p>
+                    <p class="title is-4">@FormatRate(detail.CategoryAverageWasteRate)</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">%50 mazeret eşiği</p>
+                    <p class="title is-4">@FormatRate(detail.ThresholdWasteRate)</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Mağaza fire oranı</p>
+                    <p class="title is-4 has-text-danger">@FormatRate(detail.StoreWasteRate)</p>
+                </div>
+            </div>
+            <div class="column is-one-quarter">
+                <div class="box">
+                    <p class="heading">Ortalamadan fazla kayıp</p>
+                    <p class="title is-4 has-text-danger">%@detail.DeviationPercent.ToString("N0")</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="columns is-variable is-5">
+            <div class="column is-two-thirds">
+                <section class="box mb-5">
+                    <h2 class="title is-5">Mazeret geçmişi</h2>
+                    @if (detail.Entries.Count == 0)
+                    {
+                        <div class="notification is-light">Henüz açıklama gönderilmedi.</div>
+                    }
+                    else
+                    {
+                        @foreach (var entry in detail.Entries)
+                        {
+                            <article class="message @EntryCss(entry.EntryType)">
+                                <div class="message-header">
+                                    <p>@ExcuseDisplayNames.EntryType(entry.EntryType)</p>
+                                    <span class="is-size-7">@entry.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                </div>
+                                <div class="message-body">
+                                    @if (entry.ReasonType.HasValue)
+                                    {
+                                        <p class="mb-2"><span class="tag is-light">@ExcuseDisplayNames.Reason(entry.ReasonType.Value)</span></p>
+                                    }
+                                    <p class="is-pre-wrap">@entry.Message</p>
+                                    <p class="is-size-7 has-text-grey mt-3">@entry.CreatedBy</p>
+                                </div>
+                            </article>
+                        }
+                    }
+                </section>
+
+                @if (detail.CanRespond)
+                {
+                    <section class="box">
+                        <h2 class="title is-5">Mağaza mazereti</h2>
+                        <div class="field">
+                            <label class="label">Mazeret türü</label>
+                            <div class="control">
+                                <div class="select is-fullwidth">
+                                    <select @bind="selectedReason">
+                                        @foreach (var reason in Enum.GetValues<ExcuseReasonType>())
+                                        {
+                                            <option value="@reason">@ExcuseDisplayNames.Reason(reason)</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label">Açıklama</label>
+                            <div class="control">
+                                <textarea class="textarea" rows="5" maxlength="2000" placeholder="Fire sapmasının nedenini ve yapılan kontrolü açıklayın." @bind="responseMessage"></textarea>
+                            </div>
+                            <p class="help">En az 10 karakter.</p>
+                        </div>
+                        <button class="button is-primary" type="button" disabled="@isSaving" @onclick="SubmitResponseAsync">
+                            <span class="icon"><i class="fas fa-paper-plane"></i></span>
+                            <span>Mazereti gönder</span>
+                        </button>
+                    </section>
+                }
+
+                @if (detail.CanReview)
+                {
+                    <section class="box">
+                        <h2 class="title is-5">Yönetici değerlendirmesi</h2>
+                        <div class="field">
+                            <label class="label">Değerlendirme notu</label>
+                            <div class="control">
+                                <textarea class="textarea" rows="4" maxlength="2000" placeholder="Onay notu isteğe bağlı, revizyon nedeni zorunludur." @bind="reviewMessage"></textarea>
+                            </div>
+                        </div>
+                        <div class="buttons">
+                            <button class="button is-success" type="button" disabled="@isSaving" @onclick="ApproveAsync">
+                                <span class="icon"><i class="fas fa-check"></i></span>
+                                <span>Onayla</span>
+                            </button>
+                            <button class="button is-warning" type="button" disabled="@isSaving" @onclick="RequestRevisionAsync">
+                                <span class="icon"><i class="fas fa-rotate-left"></i></span>
+                                <span>Revizyon iste</span>
+                            </button>
+                        </div>
+                    </section>
+                }
+            </div>
+
+            <div class="column">
+                <section class="box">
+                    <h2 class="title is-5">En yüksek fireli ürünler</h2>
+                    <p class="is-size-7 has-text-grey mb-4">Mağazanın bu kategori ve aylık rapordaki en yüksek negatif fire tutarları.</p>
+                    @if (detail.TopProducts.Count == 0)
+                    {
+                        <p class="has-text-grey">Ürün detayı bulunamadı.</p>
+                    }
+                    else
+                    {
+                        <div class="table-container">
+                            <table class="table is-fullwidth is-size-7">
+                                <thead>
+                                    <tr><th>Ürün</th><th class="has-text-right">Oran</th><th class="has-text-right">Tutar</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var product in detail.TopProducts)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <p>@(product.StockName ?? "–")</p>
+                                                <p class="has-text-grey">@(product.StockCode ?? "–")</p>
+                                            </td>
+                                            <td class="has-text-right">@FormatNullableRate(product.WasteRate)</td>
+                                            <td class="has-text-right">@FormatAmount(product.WasteAmount)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long ExcuseId { get; set; }
+
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private ExcuseDetailResult? detail;
+    private ExcuseReasonType selectedReason = ExcuseReasonType.CountingDifference;
+    private string responseMessage = string.Empty;
+    private string reviewMessage = string.Empty;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        if (currentUser.Identity?.IsAuthenticated == true) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try { detail = await ExcuseService.GetDetailAsync(ExcuseId, currentUser, cancellationTokenSource.Token); }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = exception.Message; }
+        finally { isLoading = false; }
+    }
+
+    private async Task SubmitResponseAsync()
+    {
+        if (isSaving) return;
+        var succeeded = await ExecuteAsync(
+            () => ExcuseService.SubmitResponseAsync(ExcuseId, selectedReason, responseMessage, currentUser, cancellationTokenSource.Token),
+            "Mazeretiniz değerlendirilmek üzere gönderildi.");
+        if (succeeded) responseMessage = string.Empty;
+    }
+
+    private async Task ApproveAsync() => await ExecuteAsync(
+            () => ExcuseService.ReviewAsync(ExcuseId, true, reviewMessage, currentUser, cancellationTokenSource.Token),
+            "Mazeret onaylandı.");
+
+    private async Task RequestRevisionAsync() => await ExecuteAsync(
+            () => ExcuseService.ReviewAsync(ExcuseId, false, reviewMessage, currentUser, cancellationTokenSource.Token),
+            "Mağazadan revizyon istendi.");
+
+    private async Task<bool> ExecuteAsync(Func<Task> action, string success)
+    {
+        if (isSaving) return false;
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            await action();
+            successMessage = success;
+            reviewMessage = string.Empty;
+            await LoadAsync();
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { return false; }
+        catch (Exception exception) { errorMessage = exception.Message; return false; }
+        finally { isSaving = false; }
+    }
+
+    private static string EntryCss(ExcuseEntryType type) => type switch
+    {
+        ExcuseEntryType.StoreResponse => "is-info",
+        ExcuseEntryType.RevisionRequest => "is-warning",
+        ExcuseEntryType.Approval => "is-success",
+        _ => string.Empty
+    };
+
+    private static string FormatRate(decimal value) => $"%{value:N2}";
+    private static string FormatNullableRate(decimal? value) => value.HasValue ? FormatRate(value.Value) : "–";
+    private static string FormatAmount(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "–";
+
+    public ValueTask DisposeAsync()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

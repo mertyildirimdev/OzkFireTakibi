@@ -17,6 +17,8 @@ public static class ServiceCollectionExtensions
 
         // Rapor iş mantığı servisi Scoped
         services.AddScoped<ReportImportService>();
+        services.AddScoped<ExcuseAutomationService>();
+        services.AddScoped<ExcuseService>();
 
         // BaseService soyut sınıfından türeyen tüm somut servis sınıflarını reflection ile dinamik olarak Scoped kaydet
         var serviceTypes = typeof(BaseService).Assembly

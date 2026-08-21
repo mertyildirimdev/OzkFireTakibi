@@ -29,6 +29,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// </summary>
     public DbSet<ReportRowEntity> ReportRows { get; set; } = default!;
 
+    public DbSet<StoreEntity> Stores { get; set; } = default!;
+
+    public DbSet<ExcuseRequestEntity> ExcuseRequests { get; set; } = default!;
+
+    public DbSet<ExcuseEntryEntity> ExcuseEntries { get; set; } = default!;
+
     /// <summary>
     /// Model ve şema yapılandırması
     /// </summary>
@@ -38,6 +44,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         // Raporlama tablolarını, indeksleri ve kolon eşlemelerini yapılandır
         ConfigureReportImports(modelBuilder);
+        ConfigureExcuses(modelBuilder);
 
         // Mevcut migration ve SQLite şemasıyla uyumlu olarak tablo adlarını küçük harfle tut.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -129,27 +136,74 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(x => x.ReportImportId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        reportRow.Property(x => x.PurchaseGroupValueFactor).HasColumnName("Satın Alma Grubu Değer Çarpanı").HasConversion<double>();
-        reportRow.Property(x => x.PurchaseStockValueFactor).HasColumnName("Satın Alma Stok Değer Çarpanı").HasConversion<double>();
-        reportRow.Property(x => x.OpeningQuantity).HasColumnName("Dönem Başı Miktar").HasConversion<double>();
-        reportRow.Property(x => x.OpeningAmount).HasColumnName("Dönem Başı Tutar").HasConversion<double>();
-        reportRow.Property(x => x.CompanyPurchaseQuantity).HasColumnName("Firma Alış Miktar").HasConversion<double>();
-        reportRow.Property(x => x.CompanyPurchaseAmount).HasColumnName("Firma Alış Tutar").HasConversion<double>();
-        reportRow.Property(x => x.WarehouseTransferInQuantity).HasColumnName("Depo Sevk Alış Miktar").HasConversion<double>();
-        reportRow.Property(x => x.WarehouseTransferInAmount).HasColumnName("Depo Sevk Alış Tutar").HasConversion<double>();
-        reportRow.Property(x => x.WarehouseTransferOutQuantity).HasColumnName("Depo Sevk Satış Miktar").HasConversion<double>();
-        reportRow.Property(x => x.WarehouseTransferOutAmount).HasColumnName("Depo Sevk Satış Tutar").HasConversion<double>();
-        reportRow.Property(x => x.StoreSalesQuantity).HasColumnName("Mağaza Satış Miktar").HasConversion<double>();
-        reportRow.Property(x => x.StoreSalesAmount).HasColumnName("Mağaza Satış Tutar").HasConversion<double>();
-        reportRow.Property(x => x.CostOfSales).HasColumnName("Satış Maliyeti").HasConversion<double>();
-        reportRow.Property(x => x.WasteRate).HasColumnName("Fire Oranı").HasConversion<double>();
-        reportRow.Property(x => x.WasteQuantity).HasColumnName("Fire Miktarı").HasConversion<double>();
-        reportRow.Property(x => x.WasteAmount).HasColumnName("Fire Tutarı").HasConversion<double>();
-        reportRow.Property(x => x.ClosingQuantity).HasColumnName("Dönem Sonu Miktar").HasConversion<double>();
-        reportRow.Property(x => x.ClosingAmount).HasColumnName("Dönem Sonu Tutar").HasConversion<double>();
-        reportRow.Property(x => x.ProfitAmount).HasColumnName("Kar Tutar").HasConversion<double>();
-        reportRow.Property(x => x.ProfitRate).HasColumnName("Kar Oran").HasConversion<double>();
-        reportRow.Property(x => x.CategoryProfitRate).HasColumnName("Kategori Kar Oran").HasConversion<double>();
-        reportRow.Property(x => x.CategoryWasteRate).HasColumnName("Kategori Fire Oran").HasConversion<double>();
+        reportRow.Property(x => x.PurchaseGroupValueFactor).HasColumnName("Satın Alma Grubu Değer Çarpanı").HasPrecision(20, 6);
+        reportRow.Property(x => x.PurchaseStockValueFactor).HasColumnName("Satın Alma Stok Değer Çarpanı").HasPrecision(20, 6);
+        reportRow.Property(x => x.OpeningQuantity).HasColumnName("Dönem Başı Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.OpeningAmount).HasColumnName("Dönem Başı Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.CompanyPurchaseQuantity).HasColumnName("Firma Alış Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.CompanyPurchaseAmount).HasColumnName("Firma Alış Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.WarehouseTransferInQuantity).HasColumnName("Depo Sevk Alış Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.WarehouseTransferInAmount).HasColumnName("Depo Sevk Alış Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.WarehouseTransferOutQuantity).HasColumnName("Depo Sevk Satış Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.WarehouseTransferOutAmount).HasColumnName("Depo Sevk Satış Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.StoreSalesQuantity).HasColumnName("Mağaza Satış Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.StoreSalesAmount).HasColumnName("Mağaza Satış Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.CostOfSales).HasColumnName("Satış Maliyeti").HasPrecision(20, 6);
+        reportRow.Property(x => x.WasteRate).HasColumnName("Fire Oranı").HasPrecision(20, 6);
+        reportRow.Property(x => x.WasteQuantity).HasColumnName("Fire Miktarı").HasPrecision(20, 6);
+        reportRow.Property(x => x.WasteAmount).HasColumnName("Fire Tutarı").HasPrecision(20, 6);
+        reportRow.Property(x => x.ClosingQuantity).HasColumnName("Dönem Sonu Miktar").HasPrecision(20, 6);
+        reportRow.Property(x => x.ClosingAmount).HasColumnName("Dönem Sonu Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.ProfitAmount).HasColumnName("Kar Tutar").HasPrecision(20, 6);
+        reportRow.Property(x => x.ProfitRate).HasColumnName("Kar Oran").HasPrecision(20, 6);
+        reportRow.Property(x => x.CategoryProfitRate).HasColumnName("Kategori Kar Oran").HasPrecision(20, 6);
+        reportRow.Property(x => x.CategoryWasteRate).HasColumnName("Kategori Fire Oran").HasPrecision(20, 6);
+    }
+
+    private static void ConfigureExcuses(ModelBuilder modelBuilder)
+    {
+        var store = modelBuilder.Entity<StoreEntity>();
+        store.ToTable("stores");
+        store.Property(x => x.Id).ValueGeneratedNever();
+        store.Property(x => x.Name).HasMaxLength(160);
+
+        var request = modelBuilder.Entity<ExcuseRequestEntity>();
+        request.ToTable("excuse_requests");
+        request.Property(x => x.StoreName).HasMaxLength(160);
+        request.Property(x => x.CategoryCode).HasMaxLength(40);
+        request.Property(x => x.CategoryName).HasMaxLength(200);
+        request.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        request.Property(x => x.StatusBeforeSuperseded).HasConversion<string>().HasMaxLength(30);
+        request.Property(x => x.CategoryAverageWasteRate).HasPrecision(20, 6);
+        request.Property(x => x.StoreWasteRate).HasPrecision(20, 6);
+        request.Property(x => x.ThresholdWasteRate).HasPrecision(20, 6);
+        request.Property(x => x.DeviationPercent).HasPrecision(20, 6);
+        request.HasIndex(x => new { x.ReportImportId, x.StoreNumber, x.CategoryCode }).IsUnique();
+        request.HasIndex(x => new { x.StoreNumber, x.Status });
+        request.HasIndex(x => new { x.Status, x.CreatedAt });
+        request
+            .HasOne(x => x.ReportImport)
+            .WithMany(x => x.ExcuseRequests)
+            .HasForeignKey(x => x.ReportImportId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var entry = modelBuilder.Entity<ExcuseEntryEntity>();
+        entry.ToTable("excuse_entries");
+        entry.Property(x => x.EntryType).HasConversion<string>().HasMaxLength(30);
+        entry.Property(x => x.ReasonType).HasConversion<string>().HasMaxLength(40);
+        entry.Property(x => x.Message).HasMaxLength(2000);
+        entry.HasIndex(x => new { x.ExcuseRequestId, x.CreatedAt });
+        entry
+            .HasOne(x => x.ExcuseRequest)
+            .WithMany(x => x.Entries)
+            .HasForeignKey(x => x.ExcuseRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+        entry
+            .HasOne(x => x.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserEntity>().HasIndex(x => x.StoreNumber);
     }
 }
