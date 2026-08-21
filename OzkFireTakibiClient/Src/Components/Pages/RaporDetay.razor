@@ -252,26 +252,34 @@
                     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
                         <thead>
                             <tr>
-                                <th rowspan="2">Excel satırı</th>
+                                <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">Excel satırı</th>
                                 @if (detail.IncludeComparison)
                                 {
-                                    <th rowspan="2">Eşleşme</th>
+                                    <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">Eşleşme</th>
                                 }
                                 @foreach (var field in VisibleFields)
                                 {
-                                    <th class="has-text-centered" colspan="@(detail.IncludeComparison ? 2 : 1)">@field.Label</th>
-                                }
-                            </tr>
-                            <tr>
-                                @foreach (var field in VisibleFields)
-                                {
-                                    <th class="@(field.IsNumeric ? "has-text-right" : null)">@(detail.Header.PeriodType == ReportPeriodType.Monthly ? "Aylık" : "Kümülatif")</th>
-                                    @if (detail.IncludeComparison)
+                                    @if (detail.IncludeComparison && field.IsComparable)
                                     {
-                                        <th class="@(field.IsNumeric ? "has-text-right" : null)">Kümülatif</th>
+                                        <th class="has-text-centered" colspan="2">@field.Label</th>
+                                    }
+                                    else
+                                    {
+                                        <th class="@(field.IsNumeric ? "has-text-right" : null)"
+                                            rowspan="@(ShowComparisonSubheaders ? 2 : 1)">@field.Label</th>
                                     }
                                 }
                             </tr>
+                            @if (ShowComparisonSubheaders)
+                            {
+                                <tr>
+                                    @foreach (var field in VisibleFields.Where(column => column.IsComparable))
+                                    {
+                                        <th class="has-text-right">Aylık</th>
+                                        <th class="@(field.IsNumeric ? "has-text-right" : null)">Kümülatif</th>
+                                    }
+                                </tr>
+                            }
                         </thead>
                         <tbody>
                             @foreach (var row in detail.Rows)
@@ -289,7 +297,7 @@
                                     @foreach (var field in VisibleFields)
                                     {
                                         <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row)</td>
-                                        @if (detail.IncludeComparison)
+                                        @if (detail.IncludeComparison && field.IsComparable)
                                         {
                                             <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row.Comparison)</td>
                                         }
@@ -396,26 +404,26 @@
         new("costGroupCode", "Maliyet Grup Kodu", row => DisplayText(row.CostGroupCode)),
         new("purchaseGroupValueFactor", "Satın Alma Grubu Değer Çarpanı", row => FormatNumber(row.PurchaseGroupValueFactor), IsNumeric: true),
         new("purchaseStockValueFactor", "Satın Alma Stok Değer Çarpanı", row => FormatNumber(row.PurchaseStockValueFactor), IsNumeric: true),
-        new("openingQuantity", "Dönem Başı Miktar", row => FormatNumber(row.OpeningQuantity), IsNumeric: true),
-        new("openingAmount", "Dönem Başı Tutar", row => FormatNumber(row.OpeningAmount), IsNumeric: true),
-        new("companyPurchaseQuantity", "Firma Alış Miktar", row => FormatNumber(row.CompanyPurchaseQuantity), IsNumeric: true),
-        new("companyPurchaseAmount", "Firma Alış Tutar", row => FormatNumber(row.CompanyPurchaseAmount), IsNumeric: true),
-        new("warehouseTransferInQuantity", "Depo Sevk Alış Miktar", row => FormatNumber(row.WarehouseTransferInQuantity), IsNumeric: true),
-        new("warehouseTransferInAmount", "Depo Sevk Alış Tutar", row => FormatNumber(row.WarehouseTransferInAmount), IsNumeric: true),
-        new("warehouseTransferOutQuantity", "Depo Sevk Satış Miktar", row => FormatNumber(row.WarehouseTransferOutQuantity), IsNumeric: true),
-        new("warehouseTransferOutAmount", "Depo Sevk Satış Tutar", row => FormatNumber(row.WarehouseTransferOutAmount), IsNumeric: true),
-        new("storeSalesQuantity", "Mağaza Satış Miktar", row => FormatNumber(row.StoreSalesQuantity), IsNumeric: true),
-        new("storeSalesAmount", "Mağaza Satış Tutar", row => FormatNumber(row.StoreSalesAmount), IsNumeric: true),
-        new("costOfSales", "Satış Maliyeti", row => FormatNumber(row.CostOfSales), IsNumeric: true),
-        new("wasteRate", "Fire Oranı", row => FormatRate(row.WasteRate), IsNumeric: true),
-        new("wasteQuantity", "Fire Miktarı", row => FormatNumber(row.WasteQuantity), IsNumeric: true),
-        new("wasteAmount", "Fire Tutarı", row => FormatNumber(row.WasteAmount), IsNumeric: true),
+        new("openingQuantity", "Dönem Başı Miktar", row => FormatNumber(row.OpeningQuantity), IsNumeric: true, IsComparable: true),
+        new("openingAmount", "Dönem Başı Tutar", row => FormatNumber(row.OpeningAmount), IsNumeric: true, IsComparable: true),
+        new("companyPurchaseQuantity", "Firma Alış Miktar", row => FormatNumber(row.CompanyPurchaseQuantity), IsNumeric: true, IsComparable: true),
+        new("companyPurchaseAmount", "Firma Alış Tutar", row => FormatNumber(row.CompanyPurchaseAmount), IsNumeric: true, IsComparable: true),
+        new("warehouseTransferInQuantity", "Depo Sevk Alış Miktar", row => FormatNumber(row.WarehouseTransferInQuantity), IsNumeric: true, IsComparable: true),
+        new("warehouseTransferInAmount", "Depo Sevk Alış Tutar", row => FormatNumber(row.WarehouseTransferInAmount), IsNumeric: true, IsComparable: true),
+        new("warehouseTransferOutQuantity", "Depo Sevk Satış Miktar", row => FormatNumber(row.WarehouseTransferOutQuantity), IsNumeric: true, IsComparable: true),
+        new("warehouseTransferOutAmount", "Depo Sevk Satış Tutar", row => FormatNumber(row.WarehouseTransferOutAmount), IsNumeric: true, IsComparable: true),
+        new("storeSalesQuantity", "Mağaza Satış Miktar", row => FormatNumber(row.StoreSalesQuantity), IsNumeric: true, IsComparable: true),
+        new("storeSalesAmount", "Mağaza Satış Tutar", row => FormatNumber(row.StoreSalesAmount), IsNumeric: true, IsComparable: true),
+        new("costOfSales", "Satış Maliyeti", row => FormatNumber(row.CostOfSales), IsNumeric: true, IsComparable: true),
+        new("wasteRate", "Fire Oranı", row => FormatRate(row.WasteRate), IsNumeric: true, IsComparable: true),
+        new("wasteQuantity", "Fire Miktarı", row => FormatNumber(row.WasteQuantity), IsNumeric: true, IsComparable: true),
+        new("wasteAmount", "Fire Tutarı", row => FormatNumber(row.WasteAmount), IsNumeric: true, IsComparable: true),
         new("closingQuantity", "Dönem Sonu Miktar", row => FormatNumber(row.ClosingQuantity), IsNumeric: true),
-        new("closingAmount", "Dönem Sonu Tutar", row => FormatNumber(row.ClosingAmount), IsNumeric: true),
-        new("profitAmount", "Kar Tutar", row => FormatNumber(row.ProfitAmount), IsNumeric: true),
-        new("profitRate", "Kar Oran", row => FormatRate(row.ProfitRate), IsNumeric: true),
-        new("categoryProfitRate", "Kategori Kar Oran", row => FormatRate(row.CategoryProfitRate), IsNumeric: true),
-        new("categoryWasteRate", "Kategori Fire Oran", row => FormatRate(row.CategoryWasteRate), IsNumeric: true)
+        new("closingAmount", "Dönem Sonu Tutar", row => FormatNumber(row.ClosingAmount), IsNumeric: true, IsComparable: true),
+        new("profitAmount", "Kar Tutar", row => FormatNumber(row.ProfitAmount), IsNumeric: true, IsComparable: true),
+        new("profitRate", "Kar Oran", row => FormatRate(row.ProfitRate), IsNumeric: true, IsComparable: true),
+        new("categoryProfitRate", "Kategori Kar Oran", row => FormatRate(row.CategoryProfitRate), IsNumeric: true, IsComparable: true),
+        new("categoryWasteRate", "Kategori Fire Oran", row => FormatRate(row.CategoryWasteRate), IsNumeric: true, IsComparable: true)
     ];
     private readonly Dictionary<ReportRowType, HashSet<string>> selectedFieldKeysByRowType = [];
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
@@ -444,6 +452,9 @@
 
     private IEnumerable<DetailField> VisibleFields =>
         fields.Where(column => SelectedFieldKeys.Contains(column.Key));
+
+    private bool ShowComparisonSubheaders =>
+        detail?.IncludeComparison == true && VisibleFields.Any(column => column.IsComparable);
 
     protected override async Task OnInitializedAsync()
     {
@@ -632,5 +643,6 @@
         string Key,
         string Label,
         Func<ReportDetailRowItem, string> GetValue,
-        bool IsNumeric = false);
+        bool IsNumeric = false,
+        bool IsComparable = false);
 }
