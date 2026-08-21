@@ -223,6 +223,7 @@ public sealed class ReportImportService(
         string? searchText,
         int pageNumber,
         int pageSize,
+        bool includeComparison,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
@@ -243,11 +244,35 @@ public sealed class ReportImportService(
             .SingleOrDefaultAsync(item => item.Id == reportImportId, cancellationToken)
             ?? throw new ReportNotFoundException(reportImportId);
 
+        ReportImportEntity? comparisonImport = null;
+        if (reportImport.PeriodType == ReportPeriodType.Monthly)
+        {
+            comparisonImport = await dbContext.ReportImports
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item =>
+                    item.ReportPeriodId == reportImport.ReportPeriodId &&
+                    item.PeriodType == ReportPeriodType.Cumulative &&
+                    item.IsActive,
+                    cancellationToken);
+        }
+
+        includeComparison = includeComparison && comparisonImport is not null;
+
         var generalRow = await dbContext.ReportRows
             .AsNoTracking()
             .SingleOrDefaultAsync(row =>
                 row.ReportImportId == reportImportId && row.RowType == ReportRowType.General,
                 cancellationToken);
+
+        ReportRowEntity? comparisonGeneralRow = null;
+        if (includeComparison)
+        {
+            comparisonGeneralRow = await dbContext.ReportRows
+                .AsNoTracking()
+                .SingleOrDefaultAsync(row =>
+                    row.ReportImportId == comparisonImport!.Id && row.RowType == ReportRowType.General,
+                    cancellationToken);
+        }
 
         var query = dbContext.ReportRows
             .AsNoTracking()
@@ -273,6 +298,17 @@ public sealed class ReportImportService(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        IReadOnlyDictionary<string, ReportRowEntity> comparisonRows =
+            new Dictionary<string, ReportRowEntity>(StringComparer.OrdinalIgnoreCase);
+        if (includeComparison)
+        {
+            comparisonRows = (await dbContext.ReportRows
+                    .AsNoTracking()
+                    .Where(row => row.ReportImportId == comparisonImport!.Id && row.RowType == rowType)
+                    .ToListAsync(cancellationToken))
+                .ToDictionary(row => CreateNaturalKey(row, rowType), StringComparer.OrdinalIgnoreCase);
+        }
+
         return new ReportDetailResult
         {
             Header = new ReportDetailHeader
@@ -294,14 +330,30 @@ public sealed class ReportImportService(
                 StoreProductRowCount = reportImport.StoreProductRowCount,
                 UploadedBy = reportImport.UploadedByUser.Name ?? reportImport.UploadedByUser.Email,
                 ImportedAtUtc = reportImport.CreatedAt,
-                GeneralSummary = generalRow is null ? null : CreateDetailRowItem(generalRow)
+                GeneralSummary = generalRow is null
+                    ? null
+                    : CreateDetailRowItem(generalRow, comparisonGeneralRow),
+                ComparisonSource = comparisonImport is null
+                    ? null
+                    : new ReportComparisonSource
+                    {
+                        ImportId = comparisonImport.Id,
+                        OriginalFileName = comparisonImport.OriginalFileName,
+                        StartDate = comparisonImport.StartDate,
+                        EndDate = comparisonImport.EndDate
+                    }
             },
             RowType = rowType,
             SearchText = normalizedSearchText,
             PageNumber = pageNumber,
             PageSize = pageSize,
             TotalRowCount = totalRowCount,
-            Rows = rows.Select(CreateDetailRowItem).ToArray()
+            Rows = rows.Select(row =>
+            {
+                comparisonRows.TryGetValue(CreateNaturalKey(row, rowType), out var comparisonRow);
+                return CreateDetailRowItem(row, comparisonRow);
+            }).ToArray(),
+            IncludeComparison = includeComparison
         };
     }
 
@@ -651,25 +703,57 @@ public sealed class ReportImportService(
             };
     }
 
-    private static ReportDetailRowItem CreateDetailRowItem(ReportRowEntity row) => new()
+    private static string CreateNaturalKey(ReportRowEntity row, ReportRowType rowType) => rowType switch
+    {
+        ReportRowType.General => "general",
+        ReportRowType.CategorySummary => $"category:{row.CategoryCode?.Trim()}",
+        ReportRowType.StoreSummary => $"store:{row.StoreNumber}",
+        ReportRowType.StoreCategory => $"store-category:{row.StoreNumber}|{row.CategoryCode?.Trim()}",
+        ReportRowType.ProductSummary => $"product:{row.StockCode?.Trim()}",
+        ReportRowType.StoreProduct =>
+            $"store-product:{row.StoreNumber}|{row.CategoryCode?.Trim()}|{row.StockCode?.Trim()}",
+        _ => throw new ArgumentOutOfRangeException(nameof(rowType), rowType, null)
+    };
+
+    private static ReportDetailRowItem CreateDetailRowItem(
+        ReportRowEntity row,
+        ReportRowEntity? comparisonRow = null) => new()
     {
         Id = row.Id,
         SourceRowNumber = row.SourceRowNumber,
+        SourceReportType = row.SourceReportType,
         StoreNumber = row.StoreNumber,
         StoreName = row.StoreName,
         CategoryCode = row.CategoryCode,
         CategoryName = row.CategoryName,
         StockCode = row.StockCode,
         StockName = row.StockName,
+        AlternativeName = row.AlternativeName,
+        CostGroupType = row.CostGroupType,
+        CostGroupCode = row.CostGroupCode,
+        PurchaseGroupValueFactor = row.PurchaseGroupValueFactor,
+        PurchaseStockValueFactor = row.PurchaseStockValueFactor,
+        OpeningQuantity = row.OpeningQuantity,
+        OpeningAmount = row.OpeningAmount,
+        CompanyPurchaseQuantity = row.CompanyPurchaseQuantity,
+        CompanyPurchaseAmount = row.CompanyPurchaseAmount,
+        WarehouseTransferInQuantity = row.WarehouseTransferInQuantity,
+        WarehouseTransferInAmount = row.WarehouseTransferInAmount,
+        WarehouseTransferOutQuantity = row.WarehouseTransferOutQuantity,
+        WarehouseTransferOutAmount = row.WarehouseTransferOutAmount,
+        StoreSalesQuantity = row.StoreSalesQuantity,
         StoreSalesAmount = row.StoreSalesAmount,
         CostOfSales = row.CostOfSales,
         WasteRate = row.WasteRate,
         WasteQuantity = row.WasteQuantity,
         WasteAmount = row.WasteAmount,
+        ClosingQuantity = row.ClosingQuantity,
+        ClosingAmount = row.ClosingAmount,
         ProfitAmount = row.ProfitAmount,
         ProfitRate = row.ProfitRate,
         CategoryProfitRate = row.CategoryProfitRate,
-        CategoryWasteRate = row.CategoryWasteRate
+        CategoryWasteRate = row.CategoryWasteRate,
+        Comparison = comparisonRow is null ? null : CreateDetailRowItem(comparisonRow)
     };
 
     private static void ValidateExpectedPeriodType(

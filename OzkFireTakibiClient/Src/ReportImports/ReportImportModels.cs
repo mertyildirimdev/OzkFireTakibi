@@ -131,6 +131,7 @@ public sealed class ReportDetailResult
     public required int PageSize { get; init; }
     public required int TotalRowCount { get; init; }
     public required IReadOnlyList<ReportDetailRowItem> Rows { get; init; }
+    public required bool IncludeComparison { get; init; }
 
     public int TotalPageCount => Math.Max(1, (int)Math.Ceiling(TotalRowCount / (double)PageSize));
 }
@@ -155,6 +156,7 @@ public sealed class ReportDetailHeader
     public required string UploadedBy { get; init; }
     public required DateTime ImportedAtUtc { get; init; }
     public ReportDetailRowItem? GeneralSummary { get; init; }
+    public ReportComparisonSource? ComparisonSource { get; init; }
 
     public int Count(ReportRowType rowType) => rowType switch
     {
@@ -168,25 +170,51 @@ public sealed class ReportDetailHeader
     };
 }
 
+public sealed class ReportComparisonSource
+{
+    public required long ImportId { get; init; }
+    public required string OriginalFileName { get; init; }
+    public required DateOnly StartDate { get; init; }
+    public required DateOnly EndDate { get; init; }
+}
+
 public sealed class ReportDetailRowItem
 {
     public required long Id { get; init; }
     public required int SourceRowNumber { get; init; }
+    public required string SourceReportType { get; init; }
     public int? StoreNumber { get; init; }
     public string? StoreName { get; init; }
     public string? CategoryCode { get; init; }
     public string? CategoryName { get; init; }
     public string? StockCode { get; init; }
     public string? StockName { get; init; }
+    public string? AlternativeName { get; init; }
+    public string? CostGroupType { get; init; }
+    public string? CostGroupCode { get; init; }
+    public decimal? PurchaseGroupValueFactor { get; init; }
+    public decimal? PurchaseStockValueFactor { get; init; }
+    public decimal? OpeningQuantity { get; init; }
+    public decimal? OpeningAmount { get; init; }
+    public decimal? CompanyPurchaseQuantity { get; init; }
+    public decimal? CompanyPurchaseAmount { get; init; }
+    public decimal? WarehouseTransferInQuantity { get; init; }
+    public decimal? WarehouseTransferInAmount { get; init; }
+    public decimal? WarehouseTransferOutQuantity { get; init; }
+    public decimal? WarehouseTransferOutAmount { get; init; }
+    public decimal? StoreSalesQuantity { get; init; }
     public decimal? StoreSalesAmount { get; init; }
     public decimal? CostOfSales { get; init; }
     public decimal? WasteRate { get; init; }
     public decimal? WasteQuantity { get; init; }
     public decimal? WasteAmount { get; init; }
+    public decimal? ClosingQuantity { get; init; }
+    public decimal? ClosingAmount { get; init; }
     public decimal? ProfitAmount { get; init; }
     public decimal? ProfitRate { get; init; }
     public decimal? CategoryProfitRate { get; init; }
     public decimal? CategoryWasteRate { get; init; }
+    public ReportDetailRowItem? Comparison { get; init; }
 }
 
 public sealed class ReportDeleteResult

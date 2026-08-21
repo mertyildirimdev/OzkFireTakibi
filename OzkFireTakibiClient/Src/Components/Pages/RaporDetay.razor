@@ -84,6 +84,25 @@
                     <p class="heading">Bağlı dönem No</p>
                     <p>#@detail.Header.ReportPeriodId</p>
                 </div>
+                @if (detail.Header.PeriodType == ReportPeriodType.Monthly)
+                {
+                    <div class="column is-full">
+                        <p class="heading">Kümülatif karşılaştırma kaynağı</p>
+                        @if (detail.Header.ComparisonSource is not null)
+                        {
+                            <p class="has-text-weight-semibold">@detail.Header.ComparisonSource.OriginalFileName</p>
+                            <p class="is-size-7 has-text-grey">
+                                @detail.Header.ComparisonSource.StartDate.ToString("dd.MM.yyyy") –
+                                @detail.Header.ComparisonSource.EndDate.ToString("dd.MM.yyyy") ·
+                                Rapor #@detail.Header.ComparisonSource.ImportId
+                            </p>
+                        }
+                        else
+                        {
+                            <span class="tag is-warning is-light">Bağlı kümülatif rapor bulunamadı</span>
+                        }
+                    </div>
+                }
             </div>
         </section>
 
@@ -95,31 +114,80 @@
                     <div class="column is-one-third">
                         <p class="heading">Mağaza satış tutarı</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.StoreSalesAmount)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.StoreSalesAmount)</p>
+                        }
                     </div>
                     <div class="column is-one-third">
                         <p class="heading">Satış maliyeti</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.CostOfSales)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.CostOfSales)</p>
+                        }
                     </div>
                     <div class="column is-one-third">
                         <p class="heading">Fire</p>
                         <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.WasteRate)</p>
                         <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.WasteAmount)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">
+                                Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.WasteRate) ·
+                                @FormatNumber(detail.Header.GeneralSummary.Comparison?.WasteAmount)
+                            </p>
+                        }
                     </div>
                     <div class="column is-one-third">
                         <p class="heading">Kâr</p>
                         <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.ProfitRate)</p>
                         <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.ProfitAmount)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">
+                                Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.ProfitRate) ·
+                                @FormatNumber(detail.Header.GeneralSummary.Comparison?.ProfitAmount)
+                            </p>
+                        }
                     </div>
                     <div class="column is-one-third">
                         <p class="heading">Fire miktarı</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.WasteQuantity)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.WasteQuantity)</p>
+                        }
                     </div>
                 </div>
             </section>
         }
 
         <section class="box" aria-labelledby="rows-title">
-            <h2 id="rows-title" class="title is-5 mb-4">Excel satırları</h2>
+            <div class="level mb-4">
+                <div class="level-left">
+                    <h2 id="rows-title" class="title is-5 mb-0">Excel satırları</h2>
+                </div>
+                @if (detail.Header.PeriodType == ReportPeriodType.Monthly)
+                {
+                    <div class="level-right">
+                        <label class="checkbox">
+                            <input type="checkbox"
+                                   checked="@compareWithCumulative"
+                                   disabled="@(isLoading || detail.Header.ComparisonSource is null)"
+                                   @onchange="ToggleComparisonAsync" />
+                            Kümülatif raporla karşılaştır
+                        </label>
+                    </div>
+                }
+            </div>
+
+            @if (detail.IncludeComparison && detail.Header.ComparisonSource is not null)
+            {
+                <div class="notification is-info is-light py-3">
+                    Aylık değerler <strong>@detail.Header.ComparisonSource.OriginalFileName</strong> dosyasındaki kümülatif değerlerle yan yana gösteriliyor.
+                </div>
+            }
 
             <div class="tabs is-toggle is-toggle-rounded is-small">
                 <ul>
@@ -177,16 +245,30 @@
                     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
                         <thead>
                             <tr>
-                                <th>Excel satırı</th>
-                                <th>Mağaza</th>
-                                <th>Kategori</th>
-                                <th>Ürün</th>
-                                <th class="has-text-right">Satış tutarı</th>
-                                <th class="has-text-right">Satış maliyeti</th>
-                                <th class="has-text-right">Fire oranı</th>
-                                <th class="has-text-right">Fire tutarı</th>
-                                <th class="has-text-right">Kâr oranı</th>
-                                <th class="has-text-right">Kâr tutarı</th>
+                                <th rowspan="2">Excel satırı</th>
+                                <th rowspan="2">Mağaza</th>
+                                <th rowspan="2">Kategori</th>
+                                <th rowspan="2">Ürün</th>
+                                <th rowspan="2">Alternatif isim</th>
+                                <th rowspan="2">Maliyet grubu</th>
+                                @if (detail.IncludeComparison)
+                                {
+                                    <th rowspan="2">Eşleşme</th>
+                                }
+                                @foreach (var metric in metrics)
+                                {
+                                    <th class="has-text-centered" colspan="@(detail.IncludeComparison ? 2 : 1)">@metric.Label</th>
+                                }
+                            </tr>
+                            <tr>
+                                @foreach (var metric in metrics)
+                                {
+                                    <th class="has-text-right">@(detail.Header.PeriodType == ReportPeriodType.Monthly ? "Aylık" : "Kümülatif")</th>
+                                    @if (detail.IncludeComparison)
+                                    {
+                                        <th class="has-text-right">Kümülatif</th>
+                                    }
+                                }
                             </tr>
                         </thead>
                         <tbody>
@@ -197,12 +279,24 @@
                                     <td>@DisplayStore(row)</td>
                                     <td>@DisplayCodeAndName(row.CategoryCode, row.CategoryName)</td>
                                     <td>@DisplayCodeAndName(row.StockCode, row.StockName)</td>
-                                    <td class="has-text-right">@FormatNumber(row.StoreSalesAmount)</td>
-                                    <td class="has-text-right">@FormatNumber(row.CostOfSales)</td>
-                                    <td class="has-text-right">@FormatRate(row.WasteRate)</td>
-                                    <td class="has-text-right">@FormatNumber(row.WasteAmount)</td>
-                                    <td class="has-text-right">@FormatRate(row.ProfitRate)</td>
-                                    <td class="has-text-right">@FormatNumber(row.ProfitAmount)</td>
+                                    <td>@(row.AlternativeName ?? "–")</td>
+                                    <td>@DisplayCodeAndName(row.CostGroupType, row.CostGroupCode)</td>
+                                    @if (detail.IncludeComparison)
+                                    {
+                                        <td>
+                                            <span class="tag @(row.Comparison is null ? "is-warning is-light" : "is-success is-light")">
+                                                @(row.Comparison is null ? "Bulunamadı" : "Eşleşti")
+                                            </span>
+                                        </td>
+                                    }
+                                    @foreach (var metric in metrics)
+                                    {
+                                        <td class="has-text-right">@FormatMetric(metric, row)</td>
+                                        @if (detail.IncludeComparison)
+                                        {
+                                            <td class="has-text-right">@FormatMetric(metric, row.Comparison)</td>
+                                        }
+                                    }
                                 </tr>
                             }
                         </tbody>
@@ -242,12 +336,38 @@
 
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly ReportRowType[] rowTypes = Enum.GetValues<ReportRowType>();
+    private readonly MetricColumn[] metrics =
+    [
+        new("Satın alma grup değer çarpanı", row => row.PurchaseGroupValueFactor),
+        new("Satın alma stok değer çarpanı", row => row.PurchaseStockValueFactor),
+        new("Dönem başı miktar", row => row.OpeningQuantity),
+        new("Dönem başı tutar", row => row.OpeningAmount),
+        new("Firma alış miktar", row => row.CompanyPurchaseQuantity),
+        new("Firma alış tutar", row => row.CompanyPurchaseAmount),
+        new("Depo sevk alış miktar", row => row.WarehouseTransferInQuantity),
+        new("Depo sevk alış tutar", row => row.WarehouseTransferInAmount),
+        new("Depo sevk satış miktar", row => row.WarehouseTransferOutQuantity),
+        new("Depo sevk satış tutar", row => row.WarehouseTransferOutAmount),
+        new("Mağaza satış miktar", row => row.StoreSalesQuantity),
+        new("Mağaza satış tutar", row => row.StoreSalesAmount),
+        new("Satış maliyeti", row => row.CostOfSales),
+        new("Fire oranı", row => row.WasteRate, IsRate: true),
+        new("Fire miktarı", row => row.WasteQuantity),
+        new("Fire tutarı", row => row.WasteAmount),
+        new("Dönem sonu miktar", row => row.ClosingQuantity),
+        new("Dönem sonu tutar", row => row.ClosingAmount),
+        new("Kâr tutarı", row => row.ProfitAmount),
+        new("Kâr oranı", row => row.ProfitRate, IsRate: true),
+        new("Kategori kâr oranı", row => row.CategoryProfitRate, IsRate: true),
+        new("Kategori fire oranı", row => row.CategoryWasteRate, IsRate: true)
+    ];
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private ReportDetailResult? detail;
     private ReportRowType selectedRowType = ReportRowType.CategorySummary;
     private string searchText = string.Empty;
     private string? errorMessage;
     private bool isLoading;
+    private bool compareWithCumulative;
 
     protected override async Task OnInitializedAsync()
     {
@@ -278,9 +398,11 @@
                 searchText,
                 pageNumber,
                 50,
+                compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);
             searchText = detail.SearchText;
+            compareWithCumulative = detail.IncludeComparison;
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
         {
@@ -308,6 +430,17 @@
 
     private Task SearchAsync() => LoadDetailAsync(1);
 
+    private async Task ToggleComparisonAsync(ChangeEventArgs eventArgs)
+    {
+        if (isLoading)
+        {
+            return;
+        }
+
+        compareWithCumulative = eventArgs.Value is bool isChecked && isChecked;
+        await LoadDetailAsync(1);
+    }
+
     private async Task ClearSearchAsync()
     {
         searchText = string.Empty;
@@ -328,6 +461,11 @@
 
     private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
     private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value:N2}";
+    private static string FormatMetric(MetricColumn metric, ReportDetailRowItem? row) => row is null
+        ? "–"
+        : metric.IsRate
+            ? FormatRate(metric.GetValue(row))
+            : FormatNumber(metric.GetValue(row));
 
     private static string GetUserMessage(Exception exception) => exception switch
     {
@@ -343,4 +481,9 @@
         GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
     }
+
+    private sealed record MetricColumn(
+        string Label,
+        Func<ReportDetailRowItem, decimal?> GetValue,
+        bool IsRate = false);
 }
