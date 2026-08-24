@@ -65,8 +65,26 @@
     else if (detail is not null)
     {
         <section class="box mb-5" aria-labelledby="report-info-title">
-            <h2 id="report-info-title" class="title is-5 mb-4">Rapor bilgileri</h2>
-            <div class="columns is-multiline">
+            <div class="level is-mobile @(isReportInfoExpanded ? "mb-4" : "mb-0")">
+                <div class="level-left">
+                    <h2 id="report-info-title" class="title is-5 mb-0">Rapor bilgileri</h2>
+                </div>
+                <div class="level-right">
+                    <button class="button is-small is-light"
+                            type="button"
+                            aria-expanded="@isReportInfoExpanded"
+                            aria-controls="report-info-content"
+                            @onclick="ToggleReportInfo">
+                        <span class="icon">
+                            <i class="fas @(isReportInfoExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                        </span>
+                        <span>@(isReportInfoExpanded ? "Daralt" : "Genişlet")</span>
+                    </button>
+                </div>
+            </div>
+            @if (isReportInfoExpanded)
+            {
+                <div id="report-info-content" class="columns is-multiline">
                 <div class="column is-one-quarter">
                     <p class="heading">Kapsam</p>
                     <p class="has-text-weight-semibold">@ReportDisplayNames.Scope(detail.Header.Scope)</p>
@@ -120,14 +138,33 @@
                         }
                     </div>
                 }
-            </div>
+                </div>
+            }
         </section>
 
         @if (detail.Header.GeneralSummary is not null)
         {
             <section class="box mb-5" aria-labelledby="summary-title">
-                <h2 id="summary-title" class="title is-5 mb-4">Genel sonuç</h2>
-                <div class="columns is-multiline">
+                <div class="level is-mobile @(isGeneralSummaryExpanded ? "mb-4" : "mb-0")">
+                    <div class="level-left">
+                        <h2 id="summary-title" class="title is-5 mb-0">Genel sonuç</h2>
+                    </div>
+                    <div class="level-right">
+                        <button class="button is-small is-light"
+                                type="button"
+                                aria-expanded="@isGeneralSummaryExpanded"
+                                aria-controls="general-summary-content"
+                                @onclick="ToggleGeneralSummary">
+                            <span class="icon">
+                                <i class="fas @(isGeneralSummaryExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                            </span>
+                            <span>@(isGeneralSummaryExpanded ? "Daralt" : "Genişlet")</span>
+                        </button>
+                    </div>
+                </div>
+                @if (isGeneralSummaryExpanded)
+                {
+                    <div id="general-summary-content" class="columns is-multiline">
                     <div class="column is-one-third">
                         <p class="heading">Mağaza satış tutarı</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.StoreSalesAmount)</p>
@@ -176,7 +213,8 @@
                             <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.WasteQuantity)</p>
                         }
                     </div>
-                </div>
+                    </div>
+                }
             </section>
         }
 
@@ -364,7 +402,7 @@
             }
             else
             {
-                <div class="table-container">
+                <div class="table-container report-rows-scroll">
                     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
                         <thead>
                             <tr>
@@ -540,6 +578,8 @@
 }
 
 @code {
+    private const int DetailPageSize = 100;
+
     [Parameter]
     public long ImportId { get; set; }
 
@@ -599,6 +639,8 @@
     private string? successMessage;
     private bool isLoading;
     private bool compareWithCumulative;
+    private bool isReportInfoExpanded = true;
+    private bool isGeneralSummaryExpanded = true;
     private bool isFieldSelectorOpen;
     private bool canRequestExcuses;
     private ReportDetailRowItem? pendingExcuseRow;
@@ -657,6 +699,10 @@
     private bool HasAppliedFilters => detail is not null &&
         (HasFilters(detail.Filters) || detail.Filters.Sort != ReportDetailSort.SourceOrder);
 
+    private void ToggleReportInfo() => isReportInfoExpanded = !isReportInfoExpanded;
+
+    private void ToggleGeneralSummary() => isGeneralSummaryExpanded = !isGeneralSummaryExpanded;
+
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
@@ -688,7 +734,7 @@
                 selectedRowType,
                 filters,
                 pageNumber,
-                50,
+                DetailPageSize,
                 compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);

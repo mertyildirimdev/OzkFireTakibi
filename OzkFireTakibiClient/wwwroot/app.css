@@ -3,6 +3,11 @@ body {
     min-height: 100%;
 }
 
+:root {
+    --bulma-family-primary: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    --bulma-family-secondary: var(--bulma-family-primary);
+}
+
 h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus {
     outline: none;
 }

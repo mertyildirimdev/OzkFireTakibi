@@ -1,0 +1,11 @@
+.report-rows-scroll {
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.report-rows-scroll thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: var(--bulma-table-background-color);
+}

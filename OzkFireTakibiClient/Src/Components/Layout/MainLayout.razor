@@ -14,7 +14,7 @@
                         <span class="icon has-text-primary" aria-hidden="true">
                             <i class="fas fa-fire-flame-curved"></i>
                         </span>
-                        <span>ÖZK Fire</span>
+                        <span>ÖZK Fire Takibi</span>
                     </span>
                 </NavLink>
 
@@ -45,7 +45,7 @@
                                 </span>
                             </div>
                             <div class="navbar-item">
-                                <span class="tag is-info is-light">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                                <span class="tag is-primary is-light">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
                             </div>
                             <div class="navbar-item">
                                 <button class="button is-danger is-light is-small" type="button" @onclick="Logout">Çıkış Yap</button>
@@ -63,9 +63,7 @@
     </nav>
 
     <main class="section is-flex-grow-1">
-        <div class="container is-fluid">
-            @Body
-        </div>
+        @Body
     </main>
 </div>
 
