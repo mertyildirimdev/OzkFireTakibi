@@ -189,7 +189,7 @@ public sealed class ReportDetailResult
 {
     public required ReportDetailHeader Header { get; init; }
     public required ReportRowType RowType { get; init; }
-    public required string SearchText { get; init; }
+    public required ReportDetailFilter Filters { get; init; }
     public required int PageNumber { get; init; }
     public required int PageSize { get; init; }
     public required int TotalRowCount { get; init; }
@@ -200,6 +200,36 @@ public sealed class ReportDetailResult
     /// Toplam sayfa sayısı
     /// </summary>
     public int TotalPageCount => Math.Max(1, (int)Math.Ceiling(TotalRowCount / (double)PageSize));
+}
+
+/// <summary>
+/// Rapor detay tablosuna sunucu tarafında uygulanan sade ve kırılım duyarlı filtreler.
+/// </summary>
+public sealed class ReportDetailFilter
+{
+    public string SearchText { get; set; } = string.Empty;
+    public string StoreText { get; set; } = string.Empty;
+    public string CategoryText { get; set; } = string.Empty;
+    public string ProductText { get; set; } = string.Empty;
+    public ReportDetailWasteFilter WasteFilter { get; set; }
+    public decimal? MinimumWasteRate { get; set; }
+    public decimal? MaximumWasteRate { get; set; }
+    public ReportDetailSort Sort { get; set; }
+}
+
+public enum ReportDetailWasteFilter
+{
+    All,
+    Loss,
+    NoLoss
+}
+
+public enum ReportDetailSort
+{
+    SourceOrder,
+    WorstWasteRate,
+    WorstWasteAmount,
+    HighestSalesAmount
 }
 
 /// <summary>

@@ -260,7 +260,7 @@ public sealed class ReportImportService(
     public async Task<ReportDetailResult> GetDetailAsync(
         long reportImportId,
         ReportRowType rowType,
-        string? searchText,
+        ReportDetailFilter? filters,
         int pageNumber,
         int pageSize,
         bool includeComparison,
@@ -271,11 +271,7 @@ public sealed class ReportImportService(
 
         pageSize = Math.Clamp(pageSize, 10, 100);
         pageNumber = Math.Max(1, pageNumber);
-        var normalizedSearchText = (searchText ?? string.Empty).Trim();
-        if (normalizedSearchText.Length > 100)
-        {
-            normalizedSearchText = normalizedSearchText[..100];
-        }
+        var normalizedFilters = NormalizeDetailFilters(filters, rowType);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var reportImport = await dbContext.ReportImports
@@ -318,22 +314,88 @@ public sealed class ReportImportService(
             .AsNoTracking()
             .Where(row => row.ReportImportId == reportImportId && row.RowType == rowType);
 
-        if (normalizedSearchText.Length > 0)
+        if (normalizedFilters.SearchText.Length > 0)
         {
+            var searchText = normalizedFilters.SearchText;
+            var hasStoreNumber = int.TryParse(searchText, out var storeNumber);
             query = query.Where(row =>
-                (row.StoreName != null && row.StoreName.Contains(normalizedSearchText)) ||
-                (row.CategoryCode != null && row.CategoryCode.Contains(normalizedSearchText)) ||
-                (row.CategoryName != null && row.CategoryName.Contains(normalizedSearchText)) ||
-                (row.StockCode != null && row.StockCode.Contains(normalizedSearchText)) ||
-                (row.StockName != null && row.StockName.Contains(normalizedSearchText)));
+                (hasStoreNumber && row.StoreNumber == storeNumber) ||
+                (row.StoreName != null && row.StoreName.Contains(searchText)) ||
+                (row.CategoryCode != null && row.CategoryCode.Contains(searchText)) ||
+                (row.CategoryName != null && row.CategoryName.Contains(searchText)) ||
+                (row.StockCode != null && row.StockCode.Contains(searchText)) ||
+                (row.StockName != null && row.StockName.Contains(searchText)) ||
+                (row.AlternativeName != null && row.AlternativeName.Contains(searchText)));
+        }
+
+        if (normalizedFilters.StoreText.Length > 0)
+        {
+            var storeText = normalizedFilters.StoreText;
+            var hasStoreNumber = int.TryParse(storeText, out var storeNumber);
+            query = query.Where(row =>
+                (hasStoreNumber && row.StoreNumber == storeNumber) ||
+                (row.StoreName != null && row.StoreName.Contains(storeText)));
+        }
+
+        if (normalizedFilters.CategoryText.Length > 0)
+        {
+            var categoryText = normalizedFilters.CategoryText;
+            query = query.Where(row =>
+                (row.CategoryCode != null && row.CategoryCode.Contains(categoryText)) ||
+                (row.CategoryName != null && row.CategoryName.Contains(categoryText)));
+        }
+
+        if (normalizedFilters.ProductText.Length > 0)
+        {
+            var productText = normalizedFilters.ProductText;
+            query = query.Where(row =>
+                (row.StockCode != null && row.StockCode.Contains(productText)) ||
+                (row.StockName != null && row.StockName.Contains(productText)) ||
+                (row.AlternativeName != null && row.AlternativeName.Contains(productText)));
+        }
+
+        query = normalizedFilters.WasteFilter switch
+        {
+            ReportDetailWasteFilter.Loss => query.Where(row => row.WasteRate < 0m || row.WasteAmount < 0m),
+            ReportDetailWasteFilter.NoLoss => query.Where(row =>
+                (row.WasteRate == null || row.WasteRate >= 0m) &&
+                (row.WasteAmount == null || row.WasteAmount >= 0m) &&
+                (row.WasteRate != null || row.WasteAmount != null)),
+            _ => query
+        };
+
+        if (normalizedFilters.MinimumWasteRate.HasValue)
+        {
+            query = query.Where(row => row.WasteRate >= normalizedFilters.MinimumWasteRate.Value);
+        }
+
+        if (normalizedFilters.MaximumWasteRate.HasValue)
+        {
+            query = query.Where(row => row.WasteRate <= normalizedFilters.MaximumWasteRate.Value);
         }
 
         var totalRowCount = await query.CountAsync(cancellationToken);
         var totalPageCount = Math.Max(1, (int)Math.Ceiling(totalRowCount / (double)pageSize));
         pageNumber = Math.Min(pageNumber, totalPageCount);
 
-        var rows = await query
-            .OrderBy(row => row.SourceRowNumber)
+        var orderedQuery = normalizedFilters.Sort switch
+        {
+            ReportDetailSort.WorstWasteRate => query
+                .OrderBy(row => row.WasteRate == null)
+                .ThenBy(row => row.WasteRate)
+                .ThenBy(row => row.SourceRowNumber),
+            ReportDetailSort.WorstWasteAmount => query
+                .OrderBy(row => row.WasteAmount == null)
+                .ThenBy(row => row.WasteAmount)
+                .ThenBy(row => row.SourceRowNumber),
+            ReportDetailSort.HighestSalesAmount => query
+                .OrderBy(row => row.StoreSalesAmount == null)
+                .ThenByDescending(row => row.StoreSalesAmount)
+                .ThenBy(row => row.SourceRowNumber),
+            _ => query.OrderBy(row => row.SourceRowNumber)
+        };
+
+        var rows = await orderedQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -384,7 +446,7 @@ public sealed class ReportImportService(
                     }
             },
             RowType = rowType,
-            SearchText = normalizedSearchText,
+            Filters = normalizedFilters,
             PageNumber = pageNumber,
             PageSize = pageSize,
             TotalRowCount = totalRowCount,
@@ -518,6 +580,51 @@ public sealed class ReportImportService(
         {
             throw new UnauthorizedAccessException("Rapor silmek için Admin yetkisi gereklidir.");
         }
+    }
+
+    private static ReportDetailFilter NormalizeDetailFilters(ReportDetailFilter? filters, ReportRowType rowType)
+    {
+        filters ??= new ReportDetailFilter();
+        if (rowType == ReportRowType.General)
+        {
+            return new ReportDetailFilter();
+        }
+
+        var minimumWasteRate = filters.MinimumWasteRate;
+        var maximumWasteRate = filters.MaximumWasteRate;
+        var supportsStore = rowType is
+            ReportRowType.StoreSummary or ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+        var supportsCategory = rowType is
+            ReportRowType.CategorySummary or ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+        var supportsProduct = rowType is
+            ReportRowType.ProductSummary or ReportRowType.StoreProduct;
+
+        if (minimumWasteRate.HasValue && maximumWasteRate.HasValue && minimumWasteRate > maximumWasteRate)
+        {
+            (minimumWasteRate, maximumWasteRate) = (maximumWasteRate, minimumWasteRate);
+        }
+
+        return new ReportDetailFilter
+        {
+            SearchText = NormalizeFilterText(filters.SearchText, 100),
+            StoreText = supportsStore ? NormalizeFilterText(filters.StoreText, 80) : string.Empty,
+            CategoryText = supportsCategory ? NormalizeFilterText(filters.CategoryText, 80) : string.Empty,
+            ProductText = supportsProduct ? NormalizeFilterText(filters.ProductText, 80) : string.Empty,
+            WasteFilter = Enum.IsDefined(filters.WasteFilter)
+                ? filters.WasteFilter
+                : ReportDetailWasteFilter.All,
+            MinimumWasteRate = minimumWasteRate,
+            MaximumWasteRate = maximumWasteRate,
+            Sort = Enum.IsDefined(filters.Sort)
+                ? filters.Sort
+                : ReportDetailSort.SourceOrder
+        };
+    }
+
+    private static string NormalizeFilterText(string? value, int maximumLength)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        return normalized.Length <= maximumLength ? normalized : normalized[..maximumLength];
     }
 
     private static void EnsureAuthenticated(ClaimsPrincipal user)

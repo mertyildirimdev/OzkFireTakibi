@@ -227,33 +227,132 @@
                 </ul>
             </div>
 
-            <div class="field has-addons mb-4">
-                <div class="control is-expanded">
-                    <input class="input"
-                           type="search"
-                           maxlength="100"
-                           placeholder="Mağaza, kategori veya ürün ara"
-                           @bind="searchText"
-                           @bind:event="oninput" />
+            @if (selectedRowType != ReportRowType.General)
+            {
+            <section class="box mb-4" aria-labelledby="detail-filter-title">
+                <div class="level is-mobile mb-4">
+                    <div class="level-left">
+                        <div>
+                            <div class="is-flex is-align-items-center">
+                                <h3 id="detail-filter-title" class="title is-6 mb-0">Filtreler</h3>
+                                @if (ActiveFilterCount > 0)
+                                {
+                                    <span class="tag is-primary is-light ml-2">@ActiveFilterCount aktif</span>
+                                }
+                            </div>
+                            <p class="is-size-7 has-text-grey mt-1">@ReportDisplayNames.RowType(selectedRowType) kayıtlarında arayın ve sıralayın.</p>
+                        </div>
+                    </div>
+                    @if (HasFilterChanges)
+                    {
+                        <div class="level-right">
+                            <button class="button is-small is-ghost" type="button" disabled="@isLoading" @onclick="ClearFiltersAsync">
+                                <span class="icon"><i class="fas fa-rotate-left"></i></span>
+                                <span>Sıfırla</span>
+                            </button>
+                        </div>
+                    }
                 </div>
-                <div class="control">
-                    <button class="button is-primary"
-                            type="button"
-                            disabled="@isLoading"
-                            @onclick="SearchAsync">
-                        <span class="icon"><i class="fas fa-search"></i></span>
-                        <span>Ara</span>
+
+                <div class="columns is-multiline is-variable is-2">
+                    <div class="column is-12-tablet is-4-desktop">
+                        <label class="label is-small" for="detail-search">Hızlı arama</label>
+                        <div class="control has-icons-left">
+                            <input id="detail-search"
+                                   class="input is-small"
+                                   type="search"
+                                   maxlength="100"
+                                   placeholder="Kod veya ad yazın"
+                                   @bind="filters.SearchText"
+                                   @bind:event="oninput"
+                                   @onkeydown="HandleFilterKeyDown" />
+                            <span class="icon is-small is-left"><i class="fas fa-magnifying-glass"></i></span>
+                        </div>
+                    </div>
+
+                    @if (ShowStoreFilter)
+                    {
+                        <div class="column is-6-tablet is-2-desktop">
+                            <label class="label is-small" for="store-filter">Mağaza</label>
+                            <input id="store-filter" class="input is-small" type="search" maxlength="80"
+                                   placeholder="No veya mağaza adı" @bind="filters.StoreText" @bind:event="oninput"
+                                   @onkeydown="HandleFilterKeyDown" />
+                        </div>
+                    }
+
+                    @if (ShowCategoryFilter)
+                    {
+                        <div class="column is-6-tablet is-2-desktop">
+                            <label class="label is-small" for="category-filter">Kategori</label>
+                            <input id="category-filter" class="input is-small" type="search" maxlength="80"
+                                   placeholder="Kod veya kategori adı" @bind="filters.CategoryText" @bind:event="oninput"
+                                   @onkeydown="HandleFilterKeyDown" />
+                        </div>
+                    }
+
+                    @if (ShowProductFilter)
+                    {
+                        <div class="column is-6-tablet is-2-desktop">
+                            <label class="label is-small" for="product-filter">Ürün</label>
+                            <input id="product-filter" class="input is-small" type="search" maxlength="80"
+                                   placeholder="Stok kodu veya ürün" @bind="filters.ProductText" @bind:event="oninput"
+                                   @onkeydown="HandleFilterKeyDown" />
+                        </div>
+                    }
+
+                    <div class="column is-6-tablet is-2-desktop">
+                        <label class="label is-small" for="waste-filter">Fire durumu</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="waste-filter" @bind="filters.WasteFilter">
+                                <option value="@ReportDetailWasteFilter.All">Tümü</option>
+                                <option value="@ReportDetailWasteFilter.Loss">Fire var</option>
+                                <option value="@ReportDetailWasteFilter.NoLoss">Fire yok / pozitif</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-2-desktop">
+                        <label class="label is-small">Fire oranı (%)</label>
+                        <div class="field has-addons">
+                            <p class="control is-expanded">
+                                <input class="input is-small" type="number" step="0.01" placeholder="Min"
+                                       aria-label="En düşük fire oranı" @bind="filters.MinimumWasteRate" />
+                            </p>
+                            <p class="control is-expanded">
+                                <input class="input is-small" type="number" step="0.01" placeholder="Maks"
+                                       aria-label="En yüksek fire oranı" @bind="filters.MaximumWasteRate" />
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-3-desktop">
+                        <label class="label is-small" for="sort-filter">Sıralama</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="sort-filter" @bind="filters.Sort">
+                                <option value="@ReportDetailSort.SourceOrder">Excel satır sırası</option>
+                                <option value="@ReportDetailSort.WorstWasteRate">En kötü fire oranı</option>
+                                <option value="@ReportDetailSort.WorstWasteAmount">En kötü fire tutarı</option>
+                                <option value="@ReportDetailSort.HighestSalesAmount">En yüksek satış tutarı</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 is-flex is-flex-wrap-wrap is-justify-content-space-between is-align-items-center">
+                    <p class="is-size-7 has-text-grey">
+                        <strong>@detail.TotalRowCount.ToString("N0")</strong> kayıt gösteriliyor
+                        @if (HasAppliedFilters)
+                        {
+                            <span> / @detail.Header.Count(selectedRowType).ToString("N0") toplam</span>
+                        }
+                    </p>
+                    <button class="button is-primary is-small" type="button" disabled="@isLoading" @onclick="ApplyFiltersAsync">
+                        <span class="icon"><i class="fas fa-filter"></i></span>
+                        <span>Filtrele</span>
                     </button>
                 </div>
-                @if (!string.IsNullOrWhiteSpace(detail.SearchText))
-                {
-                    <div class="control">
-                        <button class="button is-light" type="button" disabled="@isLoading" @onclick="ClearSearchAsync">
-                            Temizle
-                        </button>
-                    </div>
-                }
-            </div>
+            </section>
+            }
 
             @if (isLoading)
             {
@@ -495,7 +594,7 @@
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private ReportDetailResult? detail;
     private ReportRowType selectedRowType = ReportRowType.CategorySummary;
-    private string searchText = string.Empty;
+    private ReportDetailFilter filters = new();
     private string? errorMessage;
     private string? successMessage;
     private bool isLoading;
@@ -534,6 +633,30 @@
     private bool ShowComparisonSubheaders =>
         detail?.IncludeComparison == true && VisibleFields.Any(column => column.IsComparable);
 
+    private bool ShowStoreFilter => selectedRowType is
+        ReportRowType.StoreSummary or ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+
+    private bool ShowCategoryFilter => selectedRowType is
+        ReportRowType.CategorySummary or ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+
+    private bool ShowProductFilter => selectedRowType is
+        ReportRowType.ProductSummary or ReportRowType.StoreProduct;
+
+    private int ActiveFilterCount =>
+        CountFilter(filters.SearchText) +
+        CountFilter(ShowStoreFilter ? filters.StoreText : null) +
+        CountFilter(ShowCategoryFilter ? filters.CategoryText : null) +
+        CountFilter(ShowProductFilter ? filters.ProductText : null) +
+        (filters.WasteFilter == ReportDetailWasteFilter.All ? 0 : 1) +
+        (filters.MinimumWasteRate.HasValue ? 1 : 0) +
+        (filters.MaximumWasteRate.HasValue ? 1 : 0);
+
+    private bool HasFilterChanges =>
+        ActiveFilterCount > 0 || filters.Sort != ReportDetailSort.SourceOrder || HasAppliedFilters;
+
+    private bool HasAppliedFilters => detail is not null &&
+        (HasFilters(detail.Filters) || detail.Filters.Sort != ReportDetailSort.SourceOrder);
+
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
@@ -563,13 +686,13 @@
             detail = await ReportImportService.GetDetailAsync(
                 ImportId,
                 selectedRowType,
-                searchText,
+                filters,
                 pageNumber,
                 50,
                 compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);
-            searchText = detail.SearchText;
+            filters = CloneFilters(detail.Filters);
             compareWithCumulative = detail.IncludeComparison;
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
@@ -639,10 +762,19 @@
         }
 
         selectedRowType = rowType;
+        filters = new ReportDetailFilter();
         await LoadDetailAsync(1);
     }
 
-    private Task SearchAsync() => LoadDetailAsync(1);
+    private Task ApplyFiltersAsync() => LoadDetailAsync(1);
+
+    private async Task HandleFilterKeyDown(KeyboardEventArgs eventArgs)
+    {
+        if (eventArgs.Key == "Enter" && !isLoading)
+        {
+            await ApplyFiltersAsync();
+        }
+    }
 
     private async Task ToggleComparisonAsync(ChangeEventArgs eventArgs)
     {
@@ -655,9 +787,9 @@
         await LoadDetailAsync(1);
     }
 
-    private async Task ClearSearchAsync()
+    private async Task ClearFiltersAsync()
     {
-        searchText = string.Empty;
+        filters = new ReportDetailFilter();
         await LoadDetailAsync(1);
     }
 
@@ -697,6 +829,28 @@
     private Task NextPageAsync() => detail is null ? Task.CompletedTask : LoadDetailAsync(detail.PageNumber + 1);
 
     private static string DisplayText(string? value) => string.IsNullOrWhiteSpace(value) ? "–" : value;
+    private static int CountFilter(string? value) => string.IsNullOrWhiteSpace(value) ? 0 : 1;
+    private static bool HasFilters(ReportDetailFilter value) =>
+        !string.IsNullOrWhiteSpace(value.SearchText) ||
+        !string.IsNullOrWhiteSpace(value.StoreText) ||
+        !string.IsNullOrWhiteSpace(value.CategoryText) ||
+        !string.IsNullOrWhiteSpace(value.ProductText) ||
+        value.WasteFilter != ReportDetailWasteFilter.All ||
+        value.MinimumWasteRate.HasValue ||
+        value.MaximumWasteRate.HasValue;
+
+    private static ReportDetailFilter CloneFilters(ReportDetailFilter value) => new()
+    {
+        SearchText = value.SearchText,
+        StoreText = value.StoreText,
+        CategoryText = value.CategoryText,
+        ProductText = value.ProductText,
+        WasteFilter = value.WasteFilter,
+        MinimumWasteRate = value.MinimumWasteRate,
+        MaximumWasteRate = value.MaximumWasteRate,
+        Sort = value.Sort
+    };
+
     private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
     private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value:N2}";
     private string FormatField(DetailField field, ReportDetailRowItem? row)
