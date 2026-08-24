@@ -9,12 +9,16 @@ using OzkFireTakibiClient.Src.Services;
 
 /// <summary>
 /// Blazor uygulaması için özel kimlik doğrulama durum sağlayıcısı (AuthenticationStateProvider).
-/// Tarayıcı yerel depolaması (ProtectedLocalStorage) üzerinden oturum kalıcılığı ve ClaimsPrincipal yönetimini sağlar.
+/// Tarayıcı oturum/yerel depolaması üzerinden oturum kalıcılığı ve ClaimsPrincipal yönetimini sağlar.
 /// </summary>
-public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IServiceProvider serviceProvider) : AuthenticationStateProvider
+public class CustomStateProvider(
+    ProtectedLocalStorage protectedLocalStorage,
+    ProtectedSessionStorage protectedSessionStorage,
+    IServiceProvider serviceProvider) : AuthenticationStateProvider
 {
     private const string StorageKey = "auth_session";
     private readonly ProtectedLocalStorage _protectedLocalStorage = protectedLocalStorage;
+    private readonly ProtectedSessionStorage _protectedSessionStorage = protectedSessionStorage;
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private UserEntity? _currentUser;
     private bool _hasAttemptedRestore;
@@ -47,7 +51,7 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
     /// Kullanıcıyı başarılı giriş sonrası oturum açmış olarak işaretler ve durumu tüm bileşenlere bildirir.
     /// </summary>
     /// <param name="user">Giriş yapan kullanıcı varlığı</param>
-    /// <param name="rememberMe">Oturumun yerel depolamada saklanıp saklanmayacağı</param>
+    /// <param name="rememberMe">Oturumun tarayıcı kapatıldıktan sonra da korunup korunmayacağı</param>
     public async Task MarkUserAsAuthenticatedAsync(UserEntity user, bool rememberMe)
     {
         _currentUser = user;
@@ -55,27 +59,19 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
 
         if (rememberMe)
         {
-            try
-            {
-                var session = new AuthSession
-                {
-                    UserId = user.Id,
-                    ExpiresAtUtc = DateTime.UtcNow.AddDays(30)
-                };
-                await _protectedLocalStorage.SetAsync(StorageKey, session);
-            }
-            catch
-            {
-                // Tarayıcı depolama hatası oluşursa oturum yine de bellekte açılmış olur
-            }
+            try { await _protectedSessionStorage.DeleteAsync(StorageKey); }
+            catch { }
+
+            try { await _protectedLocalStorage.SetAsync(StorageKey, CreateSession(user.Id, DateTime.UtcNow.AddDays(30))); }
+            catch { /* Tarayıcı depolama hatası oluşursa oturum yine de bellekte açılmış olur. */ }
         }
         else
         {
-            try
-            {
-                await _protectedLocalStorage.DeleteAsync(StorageKey);
-            }
+            try { await _protectedLocalStorage.DeleteAsync(StorageKey); }
             catch { }
+
+            try { await _protectedSessionStorage.SetAsync(StorageKey, CreateSession(user.Id, DateTime.UtcNow.AddHours(12))); }
+            catch { /* Tarayıcı depolama hatası oluşursa oturum yine de bellekte açılmış olur. */ }
         }
 
         var identity = CreateIdentity(user);
@@ -93,42 +89,45 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         _currentUser = null;
         _hasAttemptedRestore = true;
 
-        try
-        {
-            await _protectedLocalStorage.DeleteAsync(StorageKey);
-        }
-        catch { }
+        await ClearStoredSessionsAsync();
 
         var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(anonymousUser)));
     }
 
     /// <summary>
-    /// Tarayıcı yerel depolamasında (localStorage) kayıtlı geçerli bir oturum olup olmadığını kontrol eder ve oturumu geri yükler.
+    /// Önce sekmeye ait sessionStorage, ardından kalıcı localStorage içindeki oturumu geri yüklemeyi dener.
     /// </summary>
     private async Task TryRestoreSessionAsync()
     {
         try
         {
-            var result = await _protectedLocalStorage.GetAsync<AuthSession>(StorageKey);
-            if (result.Success && result.Value is not null)
-            {
-                var session = result.Value;
-                if (session.ExpiresAtUtc > DateTime.UtcNow)
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var userService = scope.ServiceProvider.GetRequiredService<UserService>();
-                    var user = await userService.GetUserByIdAsync(session.UserId);
-                    if (user is not null)
-                    {
-                        _currentUser = user;
-                        _hasAttemptedRestore = true;
-                        return;
-                    }
-                }
+            var sessionResult = await _protectedSessionStorage.GetAsync<AuthSession>(StorageKey);
+            var session = sessionResult.Success ? sessionResult.Value : null;
 
-                // Süresi dolmuş veya geçersiz kullanıcı ise depolamadan temizle
-                await _protectedLocalStorage.DeleteAsync(StorageKey);
+            if (session is null)
+            {
+                var localResult = await _protectedLocalStorage.GetAsync<AuthSession>(StorageKey);
+                session = localResult.Success ? localResult.Value : null;
+            }
+
+            if (session is not null && session.ExpiresAtUtc > DateTime.UtcNow)
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var userService = scope.ServiceProvider.GetRequiredService<UserService>();
+                var user = await userService.GetUserByIdAsync(session.UserId);
+                if (user is not null)
+                {
+                    _currentUser = user;
+                    _hasAttemptedRestore = true;
+                    return;
+                }
+            }
+
+            if (session is not null)
+            {
+                // Süresi dolmuş veya geçersiz kullanıcı ise iki depodan da temizle.
+                await ClearStoredSessionsAsync();
             }
 
             _hasAttemptedRestore = true;
@@ -140,13 +139,24 @@ public class CustomStateProvider(ProtectedLocalStorage protectedLocalStorage, IS
         catch
         {
             _hasAttemptedRestore = true;
-            try
-            {
-                await _protectedLocalStorage.DeleteAsync(StorageKey);
-            }
-            catch { }
+            await ClearStoredSessionsAsync();
         }
     }
+
+    private async Task ClearStoredSessionsAsync()
+    {
+        try { await _protectedLocalStorage.DeleteAsync(StorageKey); }
+        catch { }
+
+        try { await _protectedSessionStorage.DeleteAsync(StorageKey); }
+        catch { }
+    }
+
+    private static AuthSession CreateSession(int userId, DateTime expiresAtUtc) => new()
+    {
+        UserId = userId,
+        ExpiresAtUtc = expiresAtUtc
+    };
 
     /// <summary>
     /// Kullanıcı varlığından ClaimsIdentity nesnesi oluşturur (Id, Name, Email, Role, StoreName talepleri eklenir).

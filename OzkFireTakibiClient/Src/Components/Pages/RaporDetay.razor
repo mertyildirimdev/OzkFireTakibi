@@ -12,6 +12,7 @@
 @implements IAsyncDisposable
 @inject ReportImportService ReportImportService
 @inject ExcuseService ExcuseService
+@inject IAuthorizationService AuthorizationService
 @using OzkFireTakibiClient.Src.Data.Entities
 
 <PageTitle>Rapor Detayı</PageTitle>
@@ -500,13 +501,14 @@
     private bool isLoading;
     private bool compareWithCumulative;
     private bool isFieldSelectorOpen;
+    private bool canRequestExcuses;
     private ReportDetailRowItem? pendingExcuseRow;
     private string manualExcuseNote = string.Empty;
     private string? manualExcuseError;
     private bool isCreatingExcuse;
 
     private bool CanCreateManualCategoryExcuse =>
-        currentUser.IsInRole("Admin") &&
+        canRequestExcuses &&
         detail?.Header.PeriodType == ReportPeriodType.Monthly &&
         detail.Header.IsActive &&
         selectedRowType == ReportRowType.StoreCategory;
@@ -539,6 +541,9 @@
 
         if (currentUser.Identity?.IsAuthenticated == true)
         {
+            canRequestExcuses = (await AuthorizationService.AuthorizeAsync(
+                currentUser,
+                ReportPolicies.CanRequestExcuses)).Succeeded;
             await LoadDetailAsync(1);
         }
     }

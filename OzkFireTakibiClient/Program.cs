@@ -57,6 +57,13 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy(ReportPolicies.CanReviewExcuses, policy =>
         policy.RequireRole(UserRole.Admin.ToString(), UserRole.Moderator.ToString()));
 
+    // Aktif aylık raporun alt detayları için mazeret isteme: merkez rollerinin tamamı
+    options.AddPolicy(ReportPolicies.CanRequestExcuses, policy =>
+        policy.RequireRole(
+            UserRole.Admin.ToString(),
+            UserRole.Moderator.ToString(),
+            UserRole.Observer.ToString()));
+
     options.AddPolicy(ReportPolicies.CanManageExcuseStores, policy =>
         policy.RequireRole(UserRole.Admin.ToString()));
 });

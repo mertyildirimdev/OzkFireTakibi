@@ -99,7 +99,7 @@ public static class UserRoleHelper
 }
 
 /// <summary>
-/// Tarayıcı yerel depolamasında (ProtectedLocalStorage) serileştirilerek tutulan oturum verisi.
+/// Tarayıcı sessionStorage veya localStorage alanında korumalı olarak tutulan oturum verisi.
 /// </summary>
 public class AuthSession
 {

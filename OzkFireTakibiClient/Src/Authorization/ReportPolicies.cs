@@ -17,5 +17,10 @@ public static class ReportPolicies
 
     public const string CanReviewExcuses = "CanReviewExcuses";
 
+    /// <summary>
+    /// Alt detay satırları için manuel mazeret talebi oluşturma yetkisi.
+    /// </summary>
+    public const string CanRequestExcuses = "CanRequestExcuses";
+
     public const string CanManageExcuseStores = "CanManageExcuseStores";
 }

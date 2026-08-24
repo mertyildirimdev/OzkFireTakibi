@@ -273,7 +273,7 @@ public sealed class ExcuseService(
         CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated(user);
-        var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanManageExcuseStores);
+        var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanRequestExcuses);
         if (!authorization.Succeeded)
         {
             throw new UnauthorizedAccessException("Alt kategori için mazeret isteme yetkiniz bulunmuyor.");
