@@ -18,5 +18,8 @@ public sealed class ExcuseOptions
     /// </summary>
     public int[] InitiallyExcludedStoreNumbers { get; set; } = [93, 94, 95, 103, 105];
 
+    /// <summary>
+    /// Mazeret listesinde bir sayfada gösterilecek kayıt sayısı.
+    /// </summary>
     public int PageSize { get; set; } = 25;
 }

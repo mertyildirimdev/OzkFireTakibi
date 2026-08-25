@@ -1,3 +1,8 @@
+@*
+    Tek bir mazeret talebinin rapor karşılaştırmasını ve zaman çizelgesini gösterir.
+    Mağaza yanıtı ile merkez onay/revizyon eylemleri servis tarafından döndürülen CanRespond ve CanReview izinlerine göre açılır.
+*@
+
 @page "/mazeretler/{ExcuseId:long}"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -251,6 +256,7 @@
         () => ExcuseService.ReviewAsync(ExcuseId, false, reviewMessage, currentUser, cancellationTokenSource.Token),
         "Mağazadan revizyon istendi.");
 
+    // Onay ve revizyon aynı yükleme, hata yönetimi ve detay yenileme akışını paylaşır.
     private async Task<bool> ExecuteAsync(Func<Task> action, string success)
     {
         if (isSaving) return false;

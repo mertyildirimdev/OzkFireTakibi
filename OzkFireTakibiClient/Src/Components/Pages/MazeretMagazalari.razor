@@ -1,3 +1,8 @@
+@*
+    Admin'in mağazaları otomatik ve manuel mazeret kapsamına dahil edip çıkarmasını sağlar.
+    Liste rapor içe aktarımı sırasında senkronize edilen kalıcı mağaza kayıtlarından gelir.
+*@
+
 @page "/mazeretler/magazalar"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -119,6 +124,7 @@
             var isEligible = args.Value is true || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
             await ExcuseService.SetStoreEligibilityAsync(store.StoreNumber, isEligible, currentUser, cancellationTokenSource.Token);
             successMessage = $"{store.StoreName} mazeret kapsamı güncellendi.";
+            // Yeni servis çağrısı yapmadan değişen satırı yerel, salt-okunur listeye yansıt.
             stores = stores.Select(item => item.StoreNumber == store.StoreNumber
                 ? new ExcuseStoreItem { StoreNumber = item.StoreNumber, StoreName = item.StoreName, IsExcuseEligible = isEligible }
                 : item).ToArray();

@@ -338,6 +338,7 @@ public sealed class ReportImportService(
 
         if (normalizedFilters.ComparisonFilter == ReportDetailComparisonFilter.WorseThanCumulative)
         {
+            // Fire oranları negatif olduğundan daha küçük aylık değer, kümülatif değerden daha kötü sonucu ifade eder.
             query = query.Where(monthly =>
                 monthly.WasteRate < 0m &&
                 dbContext.ReportRows.Any(cumulative =>
@@ -384,6 +385,7 @@ public sealed class ReportImportService(
             new Dictionary<long, ReportRowEntity>();
         if (includeComparison && rows.Length > 0)
         {
+            // Yalnızca görünür sayfadaki dönemlerin kümülatif genel satırlarını getirerek ek sorguyu sınırla.
             var reportPeriodIds = rows
                 .Select(row => row.ReportImport.ReportPeriodId)
                 .Distinct()
@@ -446,6 +448,7 @@ public sealed class ReportImportService(
         ReportImportEntity? comparisonImport = null;
         if (reportImport.PeriodType == ReportPeriodType.Monthly)
         {
+            // Karşılaştırma kaynağı dosya adına göre değil, içe aktarımda oluşturulan dönem bağıyla bulunur.
             comparisonImport = await dbContext.ReportImports
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item =>
@@ -583,6 +586,7 @@ public sealed class ReportImportService(
             new Dictionary<string, ReportRowEntity>(StringComparer.OrdinalIgnoreCase);
         if (includeComparison)
         {
+            // Satır sırası sürümler arasında değişebileceği için kırılıma özgü doğal anahtarla eşleştir.
             comparisonRows = (await dbContext.ReportRows
                     .AsNoTracking()
                     .Where(row => row.ReportImportId == comparisonImport!.Id && row.RowType == rowType)
@@ -854,6 +858,7 @@ public sealed class ReportImportService(
         IQueryable<ReportRowEntity> cumulativeRows,
         ReportRowType rowType)
     {
+        // Her kırılım yalnızca onu benzersiz yapan iş alanlarıyla eşleştirilir; kaynak Excel satır numarası kullanılmaz.
         monthlyRows = monthlyRows.Where(monthly => monthly.WasteRate < 0m);
 
         return rowType switch
@@ -1131,6 +1136,7 @@ public sealed class ReportImportService(
             };
     }
 
+    // Kümülatif satır eşleştirmesi Excel sıra numarasından bağımsız, kırılıma özgü doğal iş anahtarıyla yapılır.
     private static string CreateNaturalKey(ReportRowEntity row, ReportRowType rowType) => rowType switch
     {
         ReportRowType.General => "general",

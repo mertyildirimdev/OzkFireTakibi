@@ -29,10 +29,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// </summary>
     public DbSet<ReportRowEntity> ReportRows { get; set; } = default!;
 
+    /// <summary>
+    /// Excel raporlarından senkronize edilen mağazalar ve mazeret kapsamları.
+    /// </summary>
     public DbSet<StoreEntity> Stores { get; set; } = default!;
 
+    /// <summary>
+    /// Otomatik veya manuel olarak açılan mazeret talepleri.
+    /// </summary>
     public DbSet<ExcuseRequestEntity> ExcuseRequests { get; set; } = default!;
 
+    /// <summary>
+    /// Mazeret taleplerinin mağaza yanıtı ve değerlendirme geçmişi.
+    /// </summary>
     public DbSet<ExcuseEntryEntity> ExcuseEntries { get; set; } = default!;
 
     /// <summary>
@@ -42,7 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         base.OnModelCreating(modelBuilder);
 
-        // Raporlama tablolarını, indeksleri ve kolon eşlemelerini yapılandır
+        // Raporlama ve mazeret alanlarını ayrı metotlarda tutarak model kurulumunu okunabilir bırak.
         ConfigureReportImports(modelBuilder);
         ConfigureExcuses(modelBuilder);
 
@@ -84,6 +93,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     private static void ConfigureReportImports(ModelBuilder modelBuilder)
     {
+        // Kategori imzası ve dönem sonu, dosya adından bağımsız rapor çifti kimliğidir.
         var reportPeriod = modelBuilder.Entity<ReportPeriodEntity>();
         reportPeriod.ToTable("report_periods");
         reportPeriod.Property(x => x.CategorySignature).HasMaxLength(64);
@@ -95,6 +105,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         reportImport.Property(x => x.OriginalFileName).HasMaxLength(260);
         reportImport.Property(x => x.FileHash).HasMaxLength(64);
         reportImport.HasIndex(x => x.FileHash).IsUnique();
+        // Bir dönemde her rapor türünden yalnızca bir sürüm aktif kalabilir.
         reportImport
             .HasIndex(x => new { x.ReportPeriodId, x.PeriodType, x.IsActive })
             .IsUnique()
@@ -162,6 +173,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     private static void ConfigureExcuses(ModelBuilder modelBuilder)
     {
+        // Mağaza numarası Excel'deki Depo No olduğu için veritabanı tarafından üretilmez.
         var store = modelBuilder.Entity<StoreEntity>();
         store.ToTable("stores");
         store.Property(x => x.Id).ValueGeneratedNever();
@@ -175,6 +187,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         request.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         request.Property(x => x.StatusBeforeSuperseded).HasConversion<string>().HasMaxLength(30);
         request.Property(x => x.ThresholdRate).HasPrecision(20, 6);
+        // Aynı rapor satırı için ikinci bir otomatik veya manuel talep açılamaz.
         request.HasIndex(x => x.ReportRowId).IsUnique();
         request.HasIndex(x => new { x.Status, x.CreatedAt });
         request

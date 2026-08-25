@@ -14,6 +14,10 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
 {
     private readonly ExcuseOptions _options = options.Value;
 
+    /// <summary>
+    /// Yeni aktif aylık rapordaki mağaza firelerini rapor geneliyle karşılaştırır ve eşiği aşan,
+    /// kapsama dahil mağazalar için yinelenmeyen otomatik talepler oluşturur.
+    /// </summary>
     public async Task<int> GenerateAsync(
         AppDbContext dbContext,
         ReportImportEntity monthlyImport,
@@ -32,6 +36,7 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
         var now = DateTime.UtcNow;
         await SyncStoresAsync(dbContext, monthlyImport.Id, now, cancellationToken);
 
+        // Aynı dönemin yeni sürümü iş kuralı açısından eski taleplerin yerini alır; geçmiş silinmeden korunur.
         var olderRequests = await dbContext.ExcuseRequests
             .Where(request =>
                 request.ReportRow.ReportImportId != monthlyImport.Id &&
@@ -80,6 +85,7 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
             .ToArrayAsync(cancellationToken);
 
         var generated = new List<ExcuseRequestEntity>();
+        // Fire oranları negatif tutulur. Eşik, genel fire büyüklüğüne çarpan uygulanıp yeniden negatife çevrilir.
         var reportMagnitude = Math.Abs(reportRate);
         var thresholdRate = -(reportMagnitude * _options.ThresholdMultiplier);
 
@@ -115,6 +121,10 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
         return generated.Count;
     }
 
+    /// <summary>
+    /// Aktif sürüm silinip önceki rapor yeniden etkinleştirildiğinde yalnızca silinen sürümün
+    /// geçersiz kıldığı talepleri önceki durumlarına döndürür.
+    /// </summary>
     public async Task RestoreSupersededAsync(
         AppDbContext dbContext,
         long restoredReportImportId,
@@ -140,6 +150,10 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Rapor mağazalarını merkezi mağaza tablosuyla eşitler; ilk kez görülen depolara yapılandırmadaki
+    /// başlangıç kapsam kuralını uygular, mevcut yöneticinin kapsam tercihini değiştirmez.
+    /// </summary>
     private async Task SyncStoresAsync(
         AppDbContext dbContext,
         long reportImportId,

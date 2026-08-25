@@ -15,6 +15,9 @@ public class ExcuseEntryEntity : BaseEntity<long>
     public UserEntity CreatedByUser { get; set; } = default!;
 }
 
+/// <summary>
+/// Mazeret zaman çizelgesine eklenen işlemin türünü belirtir.
+/// </summary>
 public enum ExcuseEntryType
 {
     StoreResponse,
@@ -22,6 +25,9 @@ public enum ExcuseEntryType
     Approval
 }
 
+/// <summary>
+/// Mağazanın fire farkı için bildirebileceği standart nedenlerdir.
+/// </summary>
 public enum ExcuseReasonType
 {
     CountingDifference,

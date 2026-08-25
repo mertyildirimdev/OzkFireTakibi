@@ -11,7 +11,7 @@ public class StoreEntity : BaseEntity<int>
     public string Name { get; set; } = default!;
 
     /// <summary>
-    /// Bu mağaza için otomatik mazeret talebi oluşturulup oluşturulmayacağını belirtir.
+    /// Bu mağaza için otomatik veya manuel mazeret talebi oluşturulup oluşturulamayacağını belirtir.
     /// </summary>
     public bool IsExcuseEligible { get; set; } = true;
 }

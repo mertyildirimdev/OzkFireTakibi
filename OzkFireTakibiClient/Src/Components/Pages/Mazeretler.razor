@@ -1,3 +1,8 @@
+@*
+    Kullanıcının erişebildiği mazeret taleplerini durum ve arama filtresiyle listeler.
+    Mağaza kullanıcılarının kapsamı yalnızca UI'da değil ExcuseService sorgusunda da bağlı oldukları mağazayla sınırlandırılır.
+*@
+
 @page "/mazeretler"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -188,6 +193,7 @@
         errorMessage = null;
         try
         {
+            // Filtre ve sayfalama serviste uygulanır; istemci yalnızca dönen görünür sayfayı tutar.
             result = await ExcuseService.GetListAsync(currentUser, selectedStatus, searchText, pageNumber, cancellationTokenSource.Token);
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }

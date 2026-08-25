@@ -546,6 +546,7 @@
         "profitAmount",
         "profitRate"
     ];
+    // Excel metriklerinin etiketi, biçimi ve karşılaştırılabilirliği tek katalogdan tablo ve alan seçiciye aktarılır.
     private readonly DetailField[] fields =
     [
         new("sourceReportId", "rpr_id", row => row.SourceReportId.ToString("N0"), IsNumeric: true),
@@ -582,6 +583,7 @@
         new("categoryProfitRate", "Kategori Kar Oran", row => FormatRate(row.CategoryProfitRate), IsNumeric: true, IsComparable: true),
         new("categoryWasteRate", "Kategori Fire Oran", row => FormatRate(row.CategoryWasteRate), IsNumeric: true, IsComparable: true)
     ];
+    // Kullanıcının alan seçimi her kırılım için ayrı tutulur; sekmeler arasında geçiş seçimleri kaybettirmez.
     private readonly Dictionary<ReportRowType, HashSet<string>> selectedFieldKeysByRowType = [];
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private ReportDetailResult? detail;
@@ -695,6 +697,8 @@
                 compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);
+
+            // Servisin kırılıma göre elediği veya normalize ettiği filtreleri ekranda uygulanan değerlerle eşitle.
             filters = CloneFilters(detail.Filters);
             compareWithCumulative = detail.IncludeComparison;
         }
@@ -869,6 +873,7 @@
             return null;
         }
 
+        // Renk ölçeğinin referansı otomatik mazeret eşiğiyle aynıdır; eşiğe yaklaştıkça ve aştıkça ton koyulaşır.
         var wasteMagnitude = Math.Abs(row.WasteRate ?? 0m);
         var generalWasteMagnitude = Math.Abs(detail?.Header.GeneralSummary?.WasteRate ?? 0m);
         var thresholdMultiplier = Math.Max(ExcuseOptions.Value.ThresholdMultiplier, 0m);
@@ -912,6 +917,7 @@
         _ => [.. importantMetricFieldKeys]
     };
 
+    // Özet satırlarında doğal olarak bulunmayan boyutlar boş bırakılmak yerine kullanıcıya "Tümü" olarak gösterilir.
     private static bool IsRollupField(ReportRowType rowType, string fieldKey) => rowType switch
     {
         ReportRowType.General =>

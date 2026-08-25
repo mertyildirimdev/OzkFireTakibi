@@ -2,6 +2,9 @@ using OzkFireTakibiClient.Src.Data.Entities;
 
 namespace OzkFireTakibiClient.Src.Excuses;
 
+/// <summary>
+/// Yetkili kullanıcının görebildiği mazeretlerin sayfalı listesini ve durum sayaçlarını taşır.
+/// </summary>
 public sealed class ExcuseListResult
 {
     public required IReadOnlyList<ExcuseListItem> Items { get; init; }
@@ -19,6 +22,9 @@ public sealed class ExcuseListResult
     public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
 }
 
+/// <summary>
+/// Mazeret listesinde gösterilen tek bir talebin rapor, hedef ve fire özetidir.
+/// </summary>
 public sealed class ExcuseListItem
 {
     public required long Id { get; init; }
@@ -39,6 +45,9 @@ public sealed class ExcuseListItem
     public required DateTime CreatedAtUtc { get; init; }
 }
 
+/// <summary>
+/// Bir mazeret talebinin karşılaştırma değerlerini, işlem geçmişini ve kullanıcı eylem yetkilerini içerir.
+/// </summary>
 public sealed class ExcuseDetailResult
 {
     public required long Id { get; init; }
@@ -69,6 +78,9 @@ public sealed class ExcuseDetailResult
     public required bool CanReview { get; init; }
 }
 
+/// <summary>
+/// Mazeret zaman çizelgesindeki mağaza yanıtı veya merkez değerlendirmesidir.
+/// </summary>
 public sealed class ExcuseEntryItem
 {
     public required ExcuseEntryType EntryType { get; init; }
@@ -78,6 +90,9 @@ public sealed class ExcuseEntryItem
     public required DateTime CreatedAtUtc { get; init; }
 }
 
+/// <summary>
+/// Mağaza geneli mazeretinde sorunun kaynağını göstermek için listelenen fire veren kategori özetidir.
+/// </summary>
 public sealed class ExcuseCategoryItem
 {
     public string? CategoryCode { get; init; }
@@ -86,6 +101,9 @@ public sealed class ExcuseCategoryItem
     public decimal? WasteAmount { get; init; }
 }
 
+/// <summary>
+/// Seçili mazeret kapsamındaki en yüksek fireli ürünlerden birini temsil eder.
+/// </summary>
 public sealed class ExcuseProductItem
 {
     public string? StockCode { get; init; }
@@ -94,6 +112,9 @@ public sealed class ExcuseProductItem
     public decimal? WasteAmount { get; init; }
 }
 
+/// <summary>
+/// Mağaza/depo tanımını ve otomatik mazeret kapsamındaki güncel durumunu taşır.
+/// </summary>
 public sealed class ExcuseStoreItem
 {
     public required int StoreNumber { get; init; }
@@ -101,6 +122,9 @@ public sealed class ExcuseStoreItem
     public required bool IsExcuseEligible { get; init; }
 }
 
+/// <summary>
+/// Mazeret enum değerlerini kullanıcı arayüzündeki Türkçe etiket ve Bulma CSS sınıflarına dönüştürür.
+/// </summary>
 public static class ExcuseDisplayNames
 {
     public static string Status(ExcuseStatus status) => status switch
@@ -158,5 +182,8 @@ public static class ExcuseDisplayNames
     };
 }
 
+/// <summary>
+/// İstenen mazeret kimliği bulunamadığında veya kullanıcı erişim kapsamı dışında kaldığında kullanılır.
+/// </summary>
 public sealed class ExcuseNotFoundException(long id)
     : Exception($"{id} numaralı mazeret talebi bulunamadı.");

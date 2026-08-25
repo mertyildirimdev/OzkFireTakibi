@@ -1,3 +1,9 @@
+@*
+    Aktif aylık raporların Excel'deki genel sonuçlarını tek tabloda listeler.
+    Filtreleme ve sayfalama sunucu tarafında yapılır; isteğe bağlı karşılaştırma aynı dönemin aktif
+    kümülatif raporuyla kurulur. Dosya adı kategori üretmek için yorumlanmaz, yalnızca kaynak adı olarak gösterilir.
+*@
+
 @page "/analizler"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
@@ -380,6 +386,7 @@
     private static readonly (int Value, string Label)[] MonthOptions = Enumerable.Range(1, 12)
         .Select(month => (month, TurkishCulture.DateTimeFormat.GetMonthName(month)))
         .ToArray();
+    // Varsayılan görünüm kararını veri modelinden ayır; kullanıcı alan seçiciden diğer Excel metriklerini açabilir.
     private static readonly string[] defaultFieldKeys =
     [
         "storeSalesAmount",
@@ -461,8 +468,12 @@
                 compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);
+
+            // Servis filtreleri normalize edebilir (geçersiz ay, ters min/maks gibi); UI'yı uygulanan değerlerle eşitle.
             filters = CloneFilters(result.Filters);
             compareWithCumulative = result.IncludeComparison;
+
+            // Renk yoğunluğu yalnızca görünür sayfaya göre ölçeklenir; her sayfadaki kayıplar ayırt edilebilir kalır.
             maxVisibleWasteMagnitude = result.Rows
                 .Where(item => item.WasteRate is < 0m)
                 .Select(item => Math.Abs(item.WasteRate!.Value))
@@ -563,6 +574,7 @@
             return null;
         }
 
+        // Negatif fire oranının mutlak büyüklüğü arttıkça CSS değişkenleri satırı kademeli olarak koyulaştırır.
         var wasteMagnitude = Math.Abs(item.WasteRate ?? 0m);
         var progress = maxVisibleWasteMagnitude > 0m
             ? Math.Min(wasteMagnitude / maxVisibleWasteMagnitude, 1m)

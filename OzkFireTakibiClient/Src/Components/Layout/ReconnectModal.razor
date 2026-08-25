@@ -1,5 +1,9 @@
 ﻿<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
 
+@*
+    Blazor Server bağlantısı kesildiğinde framework'ün durum sınıflarıyla yönettiği yeniden bağlanma penceresi.
+    CSS sınıf adları ve element kimlikleri üstteki modül tarafından kullanıldığı için sözleşme niteliğindedir.
+*@
 <dialog id="components-reconnect-modal" class="box" data-nosnippet>
     <div class="is-flex is-flex-direction-column is-align-items-center">
         <span class="loader is-size-2 components-rejoining-animation" aria-hidden="true"></span>

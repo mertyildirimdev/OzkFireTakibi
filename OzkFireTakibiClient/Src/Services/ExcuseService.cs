@@ -21,6 +21,10 @@ public sealed class ExcuseService(
 {
     private readonly ExcuseOptions _options = options.Value;
 
+    /// <summary>
+    /// Merkez rollerine tüm talepleri, mağaza kullanıcısına ise yalnızca bağlı olduğu mağazanın taleplerini döndürür.
+    /// Durum sayaçları arama filtresinden bağımsız olarak kullanıcının erişebildiği aktif talepler üzerinden hesaplanır.
+    /// </summary>
     public async Task<ExcuseListResult> GetListAsync(
         ClaimsPrincipal user,
         ExcuseStatus? status,
@@ -36,6 +40,7 @@ public sealed class ExcuseService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var accessibleQuery = ApplyReadAccess(dbContext.ExcuseRequests.AsNoTracking(), access);
+        // Geçersiz kalan kayıtlar sayaçlara ve varsayılan listeye girmez; açıkça filtrelenirse geçmişten görülebilir.
         var activeQuery = accessibleQuery.Where(request => request.Status != ExcuseStatus.Superseded);
 
         var openCount = await activeQuery.CountAsync(request => request.Status == ExcuseStatus.Open, cancellationToken);
@@ -60,6 +65,7 @@ public sealed class ExcuseService(
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
         pageNumber = Math.Min(pageNumber, totalPages);
 
+        // Kullanıcının aksiyon bekleyen durumları listenin üstünde gösterilir.
         var rawItems = await query
             .OrderBy(request => request.Status == ExcuseStatus.RevisionRequested ? 0 :
                 request.Status == ExcuseStatus.Open ? 1 :
@@ -141,6 +147,10 @@ public sealed class ExcuseService(
         };
     }
 
+    /// <summary>
+    /// Talebi erişim kapsamıyla birlikte yükler; aylık ve kümülatif kıyasları, en yüksek fireli alt kırılımları
+    /// ve mevcut kullanıcıya izin verilen yanıt/değerlendirme eylemlerini hazırlar.
+    /// </summary>
     public async Task<ExcuseDetailResult> GetDetailAsync(
         long id,
         ClaimsPrincipal user,
@@ -168,6 +178,7 @@ public sealed class ExcuseService(
             reportImport,
             cancellationToken);
 
+        // Mağaza geneli talepte sorunun hangi kategorilerden kaynaklandığını özetle.
         var topCategories = targetRow.RowType == ReportRowType.StoreSummary
             ? await dbContext.ReportRows
                 .AsNoTracking()
@@ -189,6 +200,7 @@ public sealed class ExcuseService(
                 .ToArrayAsync(cancellationToken)
             : [];
 
+        // Hedef seviyesine göre ürün listesini aynı mağaza, kategori veya tek ürün kapsamına daralt.
         var topProductsQuery = dbContext.ReportRows
             .AsNoTracking()
             .Where(row =>
@@ -270,6 +282,10 @@ public sealed class ExcuseService(
         };
     }
 
+    /// <summary>
+    /// Aktif aylık rapordaki mağaza × kategori veya mağaza × ürün satırı için tekil manuel mazeret açar.
+    /// Talep notu isteğe bağlıdır; mağazanın mazeret kapsamında olması zorunludur.
+    /// </summary>
     public async Task<long> CreateManualRequestAsync(
         long reportRowId,
         string? note,
@@ -331,6 +347,9 @@ public sealed class ExcuseService(
         return request.Id;
     }
 
+    /// <summary>
+    /// Talebin ait olduğu mağaza kullanıcısının yanıtını zaman çizelgesine ekler ve talebi değerlendirmeye taşır.
+    /// </summary>
     public async Task SubmitResponseAsync(
         long id,
         ExcuseReasonType reasonType,
@@ -379,6 +398,9 @@ public sealed class ExcuseService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Yanıtlanmış talebi merkez rolü adına onaylar veya mağazadan revizyon isteyerek iş akışını günceller.
+    /// </summary>
     public async Task ReviewAsync(
         long id,
         bool approve,
@@ -421,6 +443,9 @@ public sealed class ExcuseService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Admin'in mazeret kapsamını yönetebilmesi için raporlardan senkronize edilmiş mağazaları listeler.
+    /// </summary>
     public async Task<IReadOnlyList<ExcuseStoreItem>> GetStoresAsync(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
@@ -437,6 +462,9 @@ public sealed class ExcuseService(
             .ToArrayAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Bir mağazanın gelecekte oluşturulacak otomatik ve manuel mazeretlere uygunluk durumunu değiştirir.
+    /// </summary>
     public async Task SetStoreEligibilityAsync(
         int storeNumber,
         bool isEligible,
@@ -452,6 +480,10 @@ public sealed class ExcuseService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Hedef satırı kendi üst toplamıyla karşılaştırır: mağaza→genel, mağaza-kategori→kategori,
+    /// mağaza-ürün→ürün özeti.
+    /// </summary>
     private static async Task<decimal?> GetBenchmarkRateAsync(
         AppDbContext dbContext,
         ReportRowEntity targetRow,
@@ -542,6 +574,10 @@ public sealed class ExcuseService(
         }
     }
 
+    /// <summary>
+    /// Veri erişimini yalnızca UI'da değil sorgu seviyesinde de mağazaya daraltır.
+    /// Mağaza eşlemesi yoksa güvenli varsayılan olarak boş sorgu döner.
+    /// </summary>
     private static IQueryable<ExcuseRequestEntity> ApplyReadAccess(
         IQueryable<ExcuseRequestEntity> query,
         ExcuseAccess access)
@@ -582,6 +618,7 @@ public sealed class ExcuseService(
             return null;
         }
 
+        // Fire oranları negatif saklandığı için fark, işaret yerine mutlak büyüklükler üzerinden ölçülür.
         var benchmarkMagnitude = Math.Abs(benchmarkRate.Value);
         return benchmarkMagnitude == 0m
             ? 100m

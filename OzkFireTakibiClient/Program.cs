@@ -13,7 +13,7 @@ using OzkFireTakibiClient.Src.Options;
 
 // ============================================================================
 // Uygulama Başlangıç ve Yapılandırma Dosyası (Program.cs)
-// Blazor Server servisleri, SQLite veritabanı, kimlik doğrulama,
+// Blazor Server servisleri, SQL Server veritabanı, kimlik doğrulama,
 // yetkilendirme politikaları ve middleware ardışık düzeni burada yapılandırılır.
 // ============================================================================
 
@@ -28,7 +28,7 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// SQLite veritabanı için DbContext Factory kaydı (Blazor Server'ın eşzamanlı/scoped yaşam döngüsü için önerilen yaklaşım)
+// Her Blazor işleminin kendi SQL Server bağlamını güvenle oluşturabilmesi için DbContext Factory kaydı
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -54,6 +54,7 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy(ReportPolicies.CanDeleteReports, policy =>
         policy.RequireRole(UserRole.Admin.ToString()));
 
+    // Mazeret değerlendirme: Admin ve Moderator rolleri yapabilir
     options.AddPolicy(ReportPolicies.CanReviewExcuses, policy =>
         policy.RequireRole(UserRole.Admin.ToString(), UserRole.Moderator.ToString()));
 
@@ -64,6 +65,7 @@ builder.Services.AddAuthorizationCore(options =>
             UserRole.Moderator.ToString(),
             UserRole.Observer.ToString()));
 
+    // Mazeret kapsamındaki mağazaları yönetme: Sadece Admin rolü yapabilir
     options.AddPolicy(ReportPolicies.CanManageExcuseStores, policy =>
         policy.RequireRole(UserRole.Admin.ToString()));
 });
@@ -93,7 +95,7 @@ if (!app.Environment.IsDevelopment())
 
 // 404 ve diğer durum kodlarını özel hata sayfasına yönlendir
 app.UseStatusCodePagesWithReExecute("/notfound", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 // CSRF / Antiforgery koruması
 app.UseAntiforgery();

@@ -181,6 +181,10 @@ public sealed class MonthlyAnalysisItem
     public decimal? WasteAmount { get; init; }
     public decimal? ProfitRate { get; init; }
     public decimal? ProfitAmount { get; init; }
+
+    /// <summary>
+    /// Aynı rapor dönemindeki aktif kümülatif genel sonuç; karşılaştırma kapalıysa veya eşleşme yoksa null.
+    /// </summary>
     public MonthlyAnalysisItem? Comparison { get; init; }
 }
 
@@ -216,6 +220,9 @@ public sealed class MonthlyAnalysisFilter
     public MonthlyAnalysisSort Sort { get; set; }
 }
 
+/// <summary>
+/// Analiz listesinin sunucu tarafında uygulanabilen sıralama seçenekleri.
+/// </summary>
 public enum MonthlyAnalysisSort
 {
     NewestPeriod,
@@ -275,6 +282,9 @@ public sealed class ReportDetailFilter
     public ReportDetailSort Sort { get; set; }
 }
 
+/// <summary>
+/// Negatif fire oranı veya tutarı bulunan satırların filtrelenme biçimi.
+/// </summary>
 public enum ReportDetailWasteFilter
 {
     All,
@@ -282,12 +292,18 @@ public enum ReportDetailWasteFilter
     NoLoss
 }
 
+/// <summary>
+/// Aylık satırların eşleşen kümülatif satıra göre filtrelenme biçimi.
+/// </summary>
 public enum ReportDetailComparisonFilter
 {
     All,
     WorseThanCumulative
 }
 
+/// <summary>
+/// Rapor detay satırlarının sunucu tarafındaki sıralama seçenekleri.
+/// </summary>
 public enum ReportDetailSort
 {
     SourceOrder,

@@ -403,6 +403,7 @@
 }
 
 @code {
+    // Seçilen dosyalar önizleme ve import boyunca sunucudaki geçici yollarda tutulur; bileşen kapanırken temizlenir.
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private IReadOnlyList<ReportImportHistoryItem> history = [];
@@ -436,6 +437,7 @@
     private Task HandleCumulativeFileSelectedAsync(InputFileChangeEventArgs eventArgs) =>
         HandlePairFileSelectedAsync(eventArgs, ReportPeriodType.Cumulative);
 
+    // Her dosya değişiminde yalnızca o türe ait geçici kopyayı yeniler; iki taraf hazır olunca çift doğrulamasını başlatır.
     private async Task HandlePairFileSelectedAsync(
         InputFileChangeEventArgs eventArgs,
         ReportPeriodType periodType)
@@ -486,6 +488,7 @@
                 monthlyFileName is not null &&
                 cumulativeFileName is not null)
             {
+                // Önizleme her iki dosyayı içerikten doğrular; dosya adlarından kategori veya dönem çıkarımı yapmaz.
                 pairPreview = await ReportImportService.PreviewPairAsync(
                     monthlyTemporaryFilePath,
                     monthlyFileName,
@@ -509,6 +512,7 @@
         }
     }
 
+    // Önizlemede doğrulanmış iki dosyayı servis katmanındaki tek transaction ile kalıcılaştırır.
     private async Task ImportPairAsync()
     {
         if (isProcessing ||
@@ -565,6 +569,7 @@
         }
     }
 
+    // Geçmiş ve dönem özeti birbirinden bağımsız sorgular olduğundan aynı anda yüklenir.
     private async Task LoadHistoryAsync()
     {
         if (isHistoryLoading || currentUser.Identity?.IsAuthenticated != true)
@@ -677,6 +682,7 @@
         {
             File.Delete(temporaryFilePath);
         }
+        // Geçici dosya temizleme hatası kullanıcı işlemini gölgelememeli; referanslar finally bloğunda her durumda bırakılır.
         catch (IOException)
         {
         }

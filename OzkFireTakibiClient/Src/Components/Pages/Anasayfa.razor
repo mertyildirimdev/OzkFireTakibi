@@ -1,3 +1,8 @@
+@*
+    Oturum kullanıcısının rolüne ve mağaza atamasına göre kişiselleştirilmiş karşılama, hızlı erişim
+    ve yetki özetini gösterir. Gerçek erişim denetimi sayfa/policy katmanında kalır; buradaki metinler bilgilendirme amaçlıdır.
+*@
+
 @page "/"
 @inherits AuthRequiredComponent
 
@@ -169,6 +174,7 @@
 </div>
 
 @code {
+    // Rol metinleri merkezi enum adlarıyla uyumlu, kullanıcıya gösterilecek Türkçe karşılıklardır.
     private string DisplayName => string.IsNullOrWhiteSpace(UserName) ? "Hoş geldiniz" : UserName!;
 
     private string Greeting => DateTime.Now.Hour switch

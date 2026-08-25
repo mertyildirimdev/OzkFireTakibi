@@ -24,6 +24,7 @@
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
+    // Policy tanımlı bağlantılar yetkisiz kullanıcıdan gizlenir; doğrudan URL erişimi ayrıca sayfa policy'siyle korunur.
     private readonly NavItem[] navItems =
     [
         new("Anasayfa", "fas fa-house", "", NavLinkMatch.All),

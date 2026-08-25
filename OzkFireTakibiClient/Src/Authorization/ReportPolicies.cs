@@ -15,6 +15,9 @@ public static class ReportPolicies
     /// </summary>
     public const string CanDeleteReports = "CanDeleteReports";
 
+    /// <summary>
+    /// Mağazadan gelen mazeret yanıtını onaylama veya revizyona gönderme yetkisi.
+    /// </summary>
     public const string CanReviewExcuses = "CanReviewExcuses";
 
     /// <summary>
@@ -22,5 +25,8 @@ public static class ReportPolicies
     /// </summary>
     public const string CanRequestExcuses = "CanRequestExcuses";
 
+    /// <summary>
+    /// Mağazaların otomatik mazeret kapsamına dahil edilme durumunu yönetme yetkisi.
+    /// </summary>
     public const string CanManageExcuseStores = "CanManageExcuseStores";
 }
