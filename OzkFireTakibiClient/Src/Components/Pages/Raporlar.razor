@@ -7,6 +7,7 @@
 *@
 
 @page "/raporlar"
+@attribute [Authorize(Policy = ReportPolicies.CanImportReports)]
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
 @inject ReportImportService ReportImportService
@@ -50,9 +51,7 @@
         </div>
     }
 
-    <AuthorizeView Policy="@ReportPolicies.CanImportReports">
-        <Authorized>
-            <section class="box mb-5" aria-labelledby="upload-title">
+    <section class="box mb-5" aria-labelledby="upload-title">
                 <div class="mb-4">
                     <h2 id="upload-title" class="title is-5 mb-2">Yeni rapor paketi yükle</h2>
                     <p class="has-text-grey">
@@ -205,14 +204,7 @@
                         </div>
                     </div>
                 }
-            </section>
-        </Authorized>
-        <NotAuthorized>
-            <div class="notification is-info is-light mb-5">
-                Rapor geçmişini görüntüleyebilirsiniz. Yeni rapor yükleme yetkisi yalnızca Admin ve Moderator rollerine açıktır.
-            </div>
-        </NotAuthorized>
-    </AuthorizeView>
+    </section>
 
     <section class="box mb-5" aria-labelledby="periods-title">
         <div class="mb-4">

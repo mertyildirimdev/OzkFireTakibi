@@ -59,11 +59,18 @@
             <div class="notification is-warning is-light">Bu talep daha yeni bir kesinleşen rapor yüklendiği için geçersiz kaldı. Geçmiş kayıt yalnızca denetim amacıyla gösteriliyor.</div>
         }
 
-        @if (!string.IsNullOrWhiteSpace(detail.RequestNote))
+        @if (!string.IsNullOrWhiteSpace(detail.RequestNote) || !string.IsNullOrWhiteSpace(detail.RequestedBy))
         {
             <div class="notification is-info is-light">
                 <p class="has-text-weight-semibold mb-1">Yönetici talebi</p>
-                <p>@detail.RequestNote</p>
+                @if (!string.IsNullOrWhiteSpace(detail.RequestNote))
+                {
+                    <p>@detail.RequestNote</p>
+                }
+                else
+                {
+                    <p class="has-text-grey">Ek açıklama belirtilmedi.</p>
+                }
                 @if (!string.IsNullOrWhiteSpace(detail.RequestedBy))
                 {
                     <p class="is-size-7 has-text-grey mt-2">Talep eden: @detail.RequestedBy</p>

@@ -4,16 +4,20 @@
 
 @foreach (var item in navItems)
 {
-    <NavLink class="navbar-item"
-             href="@item.Url"
-             Match="@item.Match"
-             ActiveClass="has-text-primary has-text-weight-semibold"
-             @onclick="HandleNavigate">
-        <span class="icon-text">
-            <span class="icon" aria-hidden="true"><i class="@item.Icon"></i></span>
-            <span>@item.Title</span>
-        </span>
-    </NavLink>
+    <AuthorizeView Policy="@item.Policy">
+        <Authorized>
+            <NavLink class="navbar-item"
+                     href="@item.Url"
+                     Match="@item.Match"
+                     ActiveClass="has-text-primary has-text-weight-semibold"
+                     @onclick="HandleNavigate">
+                <span class="icon-text">
+                    <span class="icon" aria-hidden="true"><i class="@item.Icon"></i></span>
+                    <span>@item.Title</span>
+                </span>
+            </NavLink>
+        </Authorized>
+    </AuthorizeView>
 }
 
 @code {
@@ -24,7 +28,7 @@
     [
         new("Anasayfa", "fas fa-house", "", NavLinkMatch.All),
         new("Analizler", "fas fa-chart-line", "/analizler", NavLinkMatch.Prefix),
-        new("Raporlar", "fas fa-file-alt", "/raporlar", NavLinkMatch.Prefix),
+        new("Raporlar", "fas fa-file-alt", "/raporlar", NavLinkMatch.Prefix, ReportPolicies.CanImportReports),
         new("Mazeretler", "fas fa-clipboard-question", "/mazeretler", NavLinkMatch.Prefix)
     ];
 
@@ -36,5 +40,10 @@
         }
     }
 
-    private sealed record NavItem(string Title, string Icon, string Url, NavLinkMatch Match);
+    private sealed record NavItem(
+        string Title,
+        string Icon,
+        string Url,
+        NavLinkMatch Match,
+        string? Policy = null);
 }

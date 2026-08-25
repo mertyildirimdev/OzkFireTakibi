@@ -509,16 +509,16 @@
                     <p class="is-size-7 has-text-grey">@DisplayText(pendingExcuseRow.StoreName) · Depo No: @(pendingExcuseRow.StoreNumber?.ToString() ?? "–")</p>
                 </div>
                 <div class="field">
-                    <label class="label">Talep notu</label>
+                    <label class="label">Talep notu <span class="has-text-weight-normal has-text-grey">(isteğe bağlı)</span></label>
                     <div class="control">
-                        <textarea class="textarea" rows="5" maxlength="2000" placeholder="Mağazadan hangi konunun açıklanmasını istediğinizi yazın." @bind="manualExcuseNote"></textarea>
+                        <textarea class="textarea" rows="5" maxlength="2000" placeholder="İsterseniz mağazadan açıklanmasını istediğiniz konuyu yazın." @bind="manualExcuseNote"></textarea>
                     </div>
-                    <p class="help">En az 5 karakter.</p>
+                    <p class="help">En fazla 2000 karakter.</p>
                 </div>
             </section>
             <footer class="modal-card-foot is-justify-content-flex-end">
                 <button class="button is-light" type="button" disabled="@isCreatingExcuse" @onclick="CloseExcuseRequest">Vazgeç</button>
-                <button class="button is-warning" type="button" disabled="@(isCreatingExcuse || manualExcuseNote.Trim().Length < 5)" @onclick="CreateManualExcuseAsync">
+                <button class="button is-warning" type="button" disabled="@isCreatingExcuse" @onclick="CreateManualExcuseAsync">
                     <span class="icon"><i class="fas fa-comment-dots"></i></span>
                     <span>Mazeret iste</span>
                 </button>

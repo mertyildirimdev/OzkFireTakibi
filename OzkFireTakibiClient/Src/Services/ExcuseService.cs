@@ -272,7 +272,7 @@ public sealed class ExcuseService(
 
     public async Task<long> CreateManualRequestAsync(
         long reportRowId,
-        string note,
+        string? note,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
@@ -283,7 +283,7 @@ public sealed class ExcuseService(
             throw new UnauthorizedAccessException("Kategori veya ürün için mazeret isteme yetkiniz bulunmuyor.");
         }
 
-        var normalizedNote = ValidateMessage(note, 5);
+        var normalizedNote = NormalizeOptionalMessage(note);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var row = await dbContext.ReportRows
             .Include(item => item.ReportImport)
@@ -594,6 +594,22 @@ public sealed class ExcuseService(
         if (string.IsNullOrWhiteSpace(normalized) || normalized.Length < minimumLength)
         {
             throw new InvalidOperationException($"Açıklama en az {minimumLength} karakter olmalıdır.");
+        }
+
+        if (normalized.Length > 2000)
+        {
+            throw new InvalidOperationException("Açıklama en fazla 2000 karakter olabilir.");
+        }
+
+        return normalized;
+    }
+
+    private static string? NormalizeOptionalMessage(string? message)
+    {
+        var normalized = message?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
         }
 
         if (normalized.Length > 2000)
