@@ -447,7 +447,7 @@
                                             rowspan="@(ShowComparisonSubheaders ? 2 : 1)">@field.Label</th>
                                     }
                                 }
-                                @if (CanCreateManualCategoryExcuse)
+                                @if (CanCreateManualExcuse)
                                 {
                                     <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">İşlem</th>
                                 }
@@ -484,7 +484,7 @@
                                             <td class="@(field.IsNumeric ? "has-text-right" : null)">@FormatField(field, row.Comparison)</td>
                                         }
                                     }
-                                    @if (CanCreateManualCategoryExcuse)
+                                    @if (CanCreateManualExcuse)
                                     {
                                         <td>
                                             <button class="button is-small is-warning is-light" type="button" @onclick="() => OpenExcuseRequest(row)">
@@ -570,7 +570,7 @@
         <div class="modal-background" @onclick="CloseExcuseRequest"></div>
         <div class="modal-card">
             <header class="modal-card-head">
-                <p id="excuse-request-title" class="modal-card-title">Alt kategori için mazeret iste</p>
+                <p id="excuse-request-title" class="modal-card-title">@ManualExcuseTargetLabel için mazeret iste</p>
                 <button class="delete" type="button" aria-label="Kapat" @onclick="CloseExcuseRequest"></button>
             </header>
             <section class="modal-card-body">
@@ -579,7 +579,7 @@
                     <div class="notification is-danger is-light">@manualExcuseError</div>
                 }
                 <div class="notification is-light">
-                    <p class="has-text-weight-semibold">@DisplayText(pendingExcuseRow.CategoryName)</p>
+                    <p class="has-text-weight-semibold">@DisplayText(ManualExcuseTargetName)</p>
                     <p class="is-size-7 has-text-grey">@DisplayText(pendingExcuseRow.StoreName) · Depo No: @(pendingExcuseRow.StoreNumber?.ToString() ?? "–")</p>
                 </div>
                 <div class="field">
@@ -672,11 +672,18 @@
     private string? manualExcuseError;
     private bool isCreatingExcuse;
 
-    private bool CanCreateManualCategoryExcuse =>
+    private bool CanCreateManualExcuse =>
         canRequestExcuses &&
         detail?.Header.PeriodType == ReportPeriodType.Monthly &&
         detail.Header.IsActive &&
-        selectedRowType == ReportRowType.StoreCategory;
+        selectedRowType is ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+
+    private string ManualExcuseTargetLabel =>
+        selectedRowType == ReportRowType.StoreProduct ? "Ürün" : "Alt kategori";
+
+    private string? ManualExcuseTargetName => selectedRowType == ReportRowType.StoreProduct
+        ? pendingExcuseRow?.StockName ?? pendingExcuseRow?.StockCode
+        : pendingExcuseRow?.CategoryName ?? pendingExcuseRow?.CategoryCode;
 
     private HashSet<string> SelectedFieldKeys
     {
@@ -805,7 +812,7 @@
 
         try
         {
-            var excuseId = await ExcuseService.CreateManualCategoryRequestAsync(
+            var excuseId = await ExcuseService.CreateManualRequestAsync(
                 pendingExcuseRow.Id,
                 manualExcuseNote,
                 currentUser,
