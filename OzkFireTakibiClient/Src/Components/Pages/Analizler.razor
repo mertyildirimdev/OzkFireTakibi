@@ -8,23 +8,62 @@
 <PageTitle>Analizler</PageTitle>
 
 <div class="container">
-    <div class="level mb-5">
+    <div class="level analysis-toolbar mb-4">
         <div class="level-left">
             <div>
-                <h1 class="title is-3 mb-2">Analizler</h1>
-                <p class="subtitle is-6 has-text-grey">
-                    Aktif aylık raporların genel fire ve kârlılık sonuçlarını inceleyin.
-                </p>
+                <h1 class="title is-3 mb-1">Analizler</h1>
+                @if (result is not null)
+                {
+                    <p class="is-size-7 has-text-grey">
+                        <strong>@result.TotalRowCount.ToString("N0")</strong> aktif aylık raporun genel sonucu
+                    </p>
+                }
+                else
+                {
+                    <p class="is-size-7 has-text-grey">Aktif aylık raporlar yükleniyor.</p>
+                }
             </div>
         </div>
         <div class="level-right">
-            <button class="button is-light"
-                    type="button"
-                    disabled="@isLoading"
-                    @onclick="LoadAsync">
-                <span class="icon"><i class="fas fa-rotate"></i></span>
-                <span>Yenile</span>
-            </button>
+            <div class="buttons">
+                <button class="button is-small is-light"
+                        type="button"
+                        disabled="@isLoading"
+                        @onclick="RefreshAsync">
+                    <span class="icon"><i class="fas fa-rotate"></i></span>
+                    <span>Yenile</span>
+                </button>
+                @if (result is not null)
+                {
+                    <button class="button is-small @(ActiveFilterCount > 0 ? "is-primary is-light" : "is-light")"
+                            type="button"
+                            aria-expanded="@isFilterPanelExpanded"
+                            aria-controls="analysis-filter-panel"
+                            @onclick="ToggleFilterPanel">
+                        <span class="icon"><i class="fas fa-filter"></i></span>
+                        <span>Filtreler</span>
+                        @if (ActiveFilterCount > 0)
+                        {
+                            <span class="tag is-primary ml-1">@ActiveFilterCount</span>
+                        }
+                        <span class="icon ml-1">
+                            <i class="fas @(isFilterPanelExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                        </span>
+                    </button>
+                    <button class="button is-small is-light" type="button" @onclick="OpenFieldSelector">
+                        <span class="icon"><i class="fas fa-table-columns"></i></span>
+                        <span>Alanlar (@selectedFieldKeys.Count/@fields.Length)</span>
+                    </button>
+                    <label class="button is-small is-light">
+                        <input class="mr-2"
+                               type="checkbox"
+                               checked="@compareWithCumulative"
+                               disabled="@(isLoading || !result.HasComparisonData)"
+                               @onchange="ToggleComparisonAsync" />
+                        Kümülatif karşılaştır
+                    </label>
+                }
+            </div>
         </div>
     </div>
 
@@ -38,101 +77,359 @@
         </div>
     }
 
-    @if (isLoading && analyses.Count == 0)
+    @if (isLoading && result is null)
     {
         <progress class="progress is-primary" max="100">Yükleniyor</progress>
     }
-    else if (analyses.Count == 0)
+    else if (result is not null)
     {
-        <section class="box has-text-centered has-text-grey py-6">
-            <span class="icon is-large"><i class="fas fa-chart-line fa-2x"></i></span>
-            <p class="mt-2">İncelenebilecek aktif aylık rapor bulunmuyor.</p>
-        </section>
-    }
-    else
-    {
-        @foreach (var monthGroup in MonthGroups)
-        {
-            <section class="mb-6" aria-labelledby="@MonthHeadingId(monthGroup.Key)">
-                <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
-                    <h2 id="@MonthHeadingId(monthGroup.Key)" class="title is-4 mb-0 is-capitalized">
-                        @FormatMonth(monthGroup.Key)
-                    </h2>
-                    <span class="tag is-light">@monthGroup.Count() rapor</span>
+        <section aria-label="Analiz sonuçları">
+            @if (result.IncludeComparison)
+            {
+                <div class="notification is-info is-light py-3">
+                    Aylık genel sonuçlar, aynı döneme bağlı aktif kümülatif raporlarla yan yana gösteriliyor.
                 </div>
+            }
 
-                <div class="analysis-list">
-                    @foreach (var item in monthGroup)
+            @if (isFilterPanelExpanded)
+            {
+            <section id="analysis-filter-panel" class="analysis-filter-panel mb-4" aria-labelledby="analysis-filter-title">
+                <div class="level is-mobile mb-4">
+                    <div class="level-left">
+                        <div>
+                            <h3 id="analysis-filter-title" class="title is-6 mb-0">Filtreler</h3>
+                            <p class="is-size-7 has-text-grey mt-1">Raporları dönem, dosya adı ve genel sonuçlarına göre süzün.</p>
+                        </div>
+                    </div>
+                    @if (HasFilterChanges)
                     {
-                        <NavLink class="analysis-link" href="@($"raporlar/{item.ImportId}")">
-                            <article class="box analysis-card">
-                                <div class="level mb-4">
-                                    <div class="level-left report-heading">
-                                        <div>
-                                            <h3 class="title is-5 mb-2 report-file-name">@item.OriginalFileName</h3>
-                                            <p class="is-size-7 has-text-grey">
-                                                @item.StartDate.ToString("dd.MM.yyyy") – @item.EndDate.ToString("dd.MM.yyyy")
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div class="level-right">
-                                        <span class="icon-text has-text-primary has-text-weight-semibold">
-                                            <span>Detayı aç</span>
-                                            <span class="icon"><i class="fas fa-arrow-right"></i></span>
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="columns is-mobile is-multiline metric-grid">
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Satış tutarı</p>
-                                        <p class="metric-value">@FormatNumber(item.StoreSalesAmount)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Satış maliyeti</p>
-                                        <p class="metric-value">@FormatNumber(item.CostOfSales)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Fire oranı</p>
-                                        <p class="metric-value has-text-danger">@FormatRate(item.WasteRate)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Fire tutarı</p>
-                                        <p class="metric-value has-text-danger">@FormatNumber(item.WasteAmount)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Fire miktarı</p>
-                                        <p class="metric-value">@FormatNumber(item.WasteQuantity)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Kâr oranı</p>
-                                        <p class="metric-value">@FormatRate(item.ProfitRate)</p>
-                                    </div>
-                                    <div class="column is-half-mobile is-one-quarter-desktop">
-                                        <p class="heading">Kâr tutarı</p>
-                                        <p class="metric-value">@FormatNumber(item.ProfitAmount)</p>
-                                    </div>
-                                </div>
-                            </article>
-                        </NavLink>
+                        <div class="level-right">
+                            <button class="button is-small is-ghost" type="button" disabled="@isLoading" @onclick="ClearFiltersAsync">
+                                <span class="icon"><i class="fas fa-rotate-left"></i></span>
+                                <span>Sıfırla</span>
+                            </button>
+                        </div>
                     }
                 </div>
+
+                <div class="columns is-multiline is-variable is-2">
+                    <div class="column is-12-tablet is-4-desktop">
+                        <label class="label is-small" for="analysis-search">Excel dosyası</label>
+                        <div class="control has-icons-left">
+                            <input id="analysis-search"
+                                   class="input is-small"
+                                   type="search"
+                                   maxlength="100"
+                                   placeholder="Dosya adında ara"
+                                   @bind="filters.SearchText"
+                                   @bind:event="oninput"
+                                   @onkeydown="HandleFilterKeyDown" />
+                            <span class="icon is-small is-left"><i class="fas fa-magnifying-glass"></i></span>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-2-desktop">
+                        <label class="label is-small" for="analysis-year">Yıl</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="analysis-year" @bind="filters.Year">
+                                <option value="">Tüm yıllar</option>
+                                @foreach (var year in result.AvailableYears)
+                                {
+                                    <option value="@year">@year</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-2-desktop">
+                        <label class="label is-small" for="analysis-month">Ay</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="analysis-month" @bind="filters.Month">
+                                <option value="">Tüm aylar</option>
+                                @foreach (var month in MonthOptions)
+                                {
+                                    <option value="@month.Value">@month.Label</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-2-desktop">
+                        <label class="label is-small" for="analysis-waste-status">Fire durumu</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="analysis-waste-status" @bind="filters.WasteFilter">
+                                <option value="@ReportDetailWasteFilter.All">Tümü</option>
+                                <option value="@ReportDetailWasteFilter.Loss">Fire verenler</option>
+                                <option value="@ReportDetailWasteFilter.NoLoss">Fire vermeyenler</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (compareWithCumulative)
+                    {
+                        <div class="column is-6-tablet is-3-desktop">
+                            <label class="label is-small" for="analysis-comparison">Kümülatif karşılaştırma</label>
+                            <div class="select is-small is-fullwidth">
+                                <select id="analysis-comparison" @bind="filters.ComparisonFilter">
+                                    <option value="@ReportDetailComparisonFilter.All">Tümü</option>
+                                    <option value="@ReportDetailComparisonFilter.WorseThanCumulative">Kümülatiften daha yüksek fire</option>
+                                </select>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="column is-6-tablet is-3-desktop">
+                        <label class="label is-small">Fire oranı (%)</label>
+                        <div class="field has-addons">
+                            <p class="control is-expanded">
+                                <input class="input is-small" type="number" step="0.01" placeholder="Min"
+                                       aria-label="En düşük fire oranı" @bind="filters.MinimumWasteRate" />
+                            </p>
+                            <p class="control is-expanded">
+                                <input class="input is-small" type="number" step="0.01" placeholder="Maks"
+                                       aria-label="En yüksek fire oranı" @bind="filters.MaximumWasteRate" />
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="column is-6-tablet is-3-desktop">
+                        <label class="label is-small" for="analysis-sort">Sıralama</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="analysis-sort" @bind="filters.Sort">
+                                <option value="@MonthlyAnalysisSort.NewestPeriod">En yeni dönem</option>
+                                <option value="@MonthlyAnalysisSort.OldestPeriod">En eski dönem</option>
+                                <option value="@MonthlyAnalysisSort.WorstWasteRate">En kötü fire oranı</option>
+                                <option value="@MonthlyAnalysisSort.WorstWasteAmount">En kötü fire tutarı</option>
+                                <option value="@MonthlyAnalysisSort.HighestSalesAmount">En yüksek satış tutarı</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 is-flex is-justify-content-flex-end">
+                    <button class="button is-primary is-small" type="button" disabled="@isLoading" @onclick="ApplyFiltersAsync">
+                        <span class="icon"><i class="fas fa-filter"></i></span>
+                        <span>Filtrele</span>
+                    </button>
+                </div>
             </section>
-        }
+            }
+
+            @if (isLoading)
+            {
+                <progress class="progress is-small is-primary" max="100">Yükleniyor</progress>
+            }
+
+            <div class="waste-scale-legend mb-2" aria-label="Fire renk göstergesi">
+                <span class="waste-scale-swatch is-soft" aria-hidden="true"></span>
+                <span class="waste-scale-swatch is-medium" aria-hidden="true"></span>
+                <span class="waste-scale-swatch is-strong" aria-hidden="true"></span>
+                <span>Genel fire büyüdükçe kırmızı ton koyulaşır.</span>
+            </div>
+
+            <div class="table-container analysis-table-scroll">
+                <table class="table is-fullwidth is-hoverable is-striped is-narrow">
+                    <thead>
+                        <tr>
+                            <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">Excel raporu</th>
+                            <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">Dönem</th>
+                            @if (result.IncludeComparison)
+                            {
+                                <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">Eşleşme</th>
+                            }
+                            @foreach (var field in VisibleFields)
+                            {
+                                @if (result.IncludeComparison)
+                                {
+                                    <th class="has-text-centered" colspan="2">@field.Label</th>
+                                }
+                                else
+                                {
+                                    <th class="has-text-right" rowspan="@(ShowComparisonSubheaders ? 2 : 1)">@field.Label</th>
+                                }
+                            }
+                            <th rowspan="@(ShowComparisonSubheaders ? 2 : 1)">İşlem</th>
+                        </tr>
+                        @if (ShowComparisonSubheaders)
+                        {
+                            <tr>
+                                @foreach (var field in VisibleFields)
+                                {
+                                    <th class="has-text-right">Aylık</th>
+                                    <th class="has-text-right">Kümülatif</th>
+                                }
+                            </tr>
+                        }
+                    </thead>
+                    <tbody>
+                        @if (result.Rows.Count == 0)
+                        {
+                            <tr>
+                                <td class="has-text-centered has-text-grey py-6" colspan="@TableColumnCount">
+                                    @(HasAppliedFilters ? "Bu filtrelere uygun aktif aylık rapor bulunamadı." : "İncelenebilecek aktif aylık rapor bulunmuyor.")
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in result.Rows)
+                            {
+                                <tr class="@GetWasteRowClass(item)" style="@GetWasteRowStyle(item)">
+                                    <td class="analysis-report-cell">
+                                        <NavLink class="analysis-report-link" href="@($"/analizler/{item.ImportId}")">
+                                            @item.OriginalFileName
+                                        </NavLink>
+                                    </td>
+                                    <td class="analysis-period-cell">
+                                        <span class="has-text-weight-semibold is-capitalized">@FormatMonth(item.EndDate)</span>
+                                        <span class="is-size-7 has-text-grey">@item.StartDate.ToString("dd.MM.yyyy") – @item.EndDate.ToString("dd.MM.yyyy")</span>
+                                    </td>
+                                    @if (result.IncludeComparison)
+                                    {
+                                        <td>
+                                            <span class="tag @(item.Comparison is null ? "is-warning is-light" : "is-success is-light")"
+                                                  title="@item.Comparison?.OriginalFileName">
+                                                @(item.Comparison is null ? "Bulunamadı" : "Eşleşti")
+                                            </span>
+                                        </td>
+                                    }
+                                    @foreach (var field in VisibleFields)
+                                    {
+                                        <td class="has-text-right analysis-metric-cell">@field.GetValue(item)</td>
+                                        @if (result.IncludeComparison)
+                                        {
+                                            <td class="has-text-right analysis-metric-cell">@FormatField(field, item.Comparison)</td>
+                                        }
+                                    }
+                                    <td>
+                                        <NavLink class="button is-small is-info is-light" href="@($"/analizler/{item.ImportId}")">
+                                            <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                                            <span>Aç</span>
+                                        </NavLink>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (result.TotalPageCount > 1)
+            {
+                <nav class="pagination is-small is-centered mt-5" role="navigation" aria-label="Sayfalama">
+                    <button class="pagination-previous"
+                            type="button"
+                            disabled="@(isLoading || result.PageNumber <= 1)"
+                            @onclick="PreviousPageAsync">
+                        Önceki
+                    </button>
+                    <button class="pagination-next"
+                            type="button"
+                            disabled="@(isLoading || result.PageNumber >= result.TotalPageCount)"
+                            @onclick="NextPageAsync">
+                        Sonraki
+                    </button>
+                    <ul class="pagination-list">
+                        <li><span class="pagination-link is-current">@result.PageNumber / @result.TotalPageCount</span></li>
+                    </ul>
+                </nav>
+            }
+        </section>
     }
 </div>
 
+@if (isFieldSelectorOpen)
+{
+    <div class="modal is-active" role="dialog" aria-modal="true" aria-labelledby="analysis-fields-title">
+        <div class="modal-background" @onclick="CloseFieldSelector"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p id="analysis-fields-title" class="modal-card-title">Gösterilecek alanlar</p>
+                <button class="delete" type="button" aria-label="Kapat" @onclick="CloseFieldSelector"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="columns is-multiline">
+                    @foreach (var field in fields)
+                    {
+                        <div class="column is-half">
+                            <label class="checkbox">
+                                <input class="mr-2"
+                                       type="checkbox"
+                                       checked="@selectedFieldKeys.Contains(field.Key)"
+                                       @onchange="eventArgs => ToggleField(field.Key, eventArgs)" />
+                                @field.Label
+                            </label>
+                        </div>
+                    }
+                </div>
+            </section>
+            <footer class="modal-card-foot is-justify-content-space-between">
+                <div class="buttons mb-0">
+                    <button class="button is-light" type="button" @onclick="ResetDefaultFields">Önemli alanlar</button>
+                    <button class="button is-light" type="button" @onclick="SelectAllFields">Tümünü seç</button>
+                </div>
+                <button class="button is-primary" type="button" @onclick="CloseFieldSelector">Uygula</button>
+            </footer>
+        </div>
+    </div>
+}
+
 @code {
+    private const int AnalysisPageSize = 25;
     private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
+    private static readonly (int Value, string Label)[] MonthOptions = Enumerable.Range(1, 12)
+        .Select(month => (month, TurkishCulture.DateTimeFormat.GetMonthName(month)))
+        .ToArray();
+    private static readonly string[] defaultFieldKeys =
+    [
+        "storeSalesAmount",
+        "costOfSales",
+        "wasteRate",
+        "wasteAmount",
+        "profitAmount",
+        "profitRate"
+    ];
+    private static readonly AnalysisField[] fields =
+    [
+        new("storeSalesAmount", "Mağaza Satış Tutarı", item => FormatNumber(item.StoreSalesAmount)),
+        new("costOfSales", "Satış Maliyeti", item => FormatNumber(item.CostOfSales)),
+        new("wasteRate", "Fire Oranı", item => FormatRate(item.WasteRate)),
+        new("wasteQuantity", "Fire Miktarı", item => FormatNumber(item.WasteQuantity)),
+        new("wasteAmount", "Fire Tutarı", item => FormatNumber(item.WasteAmount)),
+        new("profitAmount", "Kâr Tutarı", item => FormatNumber(item.ProfitAmount)),
+        new("profitRate", "Kâr Oranı", item => FormatRate(item.ProfitRate))
+    ];
+
     private readonly CancellationTokenSource cancellationTokenSource = new();
+    private readonly HashSet<string> selectedFieldKeys = new(defaultFieldKeys, StringComparer.Ordinal);
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
-    private IReadOnlyList<MonthlyAnalysisItem> analyses = [];
+    private MonthlyAnalysisResult? result;
+    private MonthlyAnalysisFilter filters = new();
     private string? errorMessage;
     private bool isLoading;
+    private bool compareWithCumulative;
+    private bool isFilterPanelExpanded;
+    private bool isFieldSelectorOpen;
+    private decimal maxVisibleWasteMagnitude;
 
-    private IEnumerable<IGrouping<DateOnly, MonthlyAnalysisItem>> MonthGroups => analyses
-        .GroupBy(item => new DateOnly(item.EndDate.Year, item.EndDate.Month, 1))
-        .OrderByDescending(group => group.Key);
+    private IEnumerable<AnalysisField> VisibleFields => fields.Where(itemField => selectedFieldKeys.Contains(itemField.Key));
+    private bool ShowComparisonSubheaders => result?.IncludeComparison == true && selectedFieldKeys.Count > 0;
+    private int TableColumnCount =>
+        3 +
+        (result?.IncludeComparison == true ? 1 : 0) +
+        selectedFieldKeys.Count * (result?.IncludeComparison == true ? 2 : 1);
+    private int ActiveFilterCount =>
+        CountFilter(filters.SearchText) +
+        (filters.Year.HasValue ? 1 : 0) +
+        (filters.Month.HasValue ? 1 : 0) +
+        (filters.WasteFilter == ReportDetailWasteFilter.All ? 0 : 1) +
+        (filters.ComparisonFilter == ReportDetailComparisonFilter.All ? 0 : 1) +
+        (filters.MinimumWasteRate.HasValue ? 1 : 0) +
+        (filters.MaximumWasteRate.HasValue ? 1 : 0);
+    private bool HasFilterChanges =>
+        ActiveFilterCount > 0 || filters.Sort != MonthlyAnalysisSort.NewestPeriod || HasAppliedFilters;
+    private bool HasAppliedFilters => result is not null &&
+        (HasFilters(result.Filters) || result.Filters.Sort != MonthlyAnalysisSort.NewestPeriod);
 
     protected override async Task OnInitializedAsync()
     {
@@ -141,11 +438,11 @@
 
         if (currentUser.Identity?.IsAuthenticated == true)
         {
-            await LoadAsync();
+            await LoadAsync(1);
         }
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(int pageNumber)
     {
         if (isLoading || currentUser.Identity?.IsAuthenticated != true)
         {
@@ -157,9 +454,20 @@
 
         try
         {
-            analyses = await ReportImportService.GetMonthlyAnalysesAsync(
+            result = await ReportImportService.GetMonthlyAnalysesAsync(
+                filters,
+                pageNumber,
+                AnalysisPageSize,
+                compareWithCumulative,
                 currentUser,
                 cancellationTokenSource.Token);
+            filters = CloneFilters(result.Filters);
+            compareWithCumulative = result.IncludeComparison;
+            maxVisibleWasteMagnitude = result.Rows
+                .Where(item => item.WasteRate is < 0m)
+                .Select(item => Math.Abs(item.WasteRate!.Value))
+                .DefaultIfEmpty(0m)
+                .Max();
         }
         catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
         {
@@ -178,12 +486,123 @@
         }
     }
 
-    private static string FormatMonth(DateOnly month) =>
-        month.ToDateTime(TimeOnly.MinValue).ToString("MMMM yyyy", TurkishCulture);
+    private Task RefreshAsync() => LoadAsync(result?.PageNumber ?? 1);
+    private Task ApplyFiltersAsync() => LoadAsync(1);
+    private Task PreviousPageAsync() => result is null ? Task.CompletedTask : LoadAsync(result.PageNumber - 1);
+    private Task NextPageAsync() => result is null ? Task.CompletedTask : LoadAsync(result.PageNumber + 1);
 
-    private static string MonthHeadingId(DateOnly month) => $"month-{month:yyyy-MM}";
+    private async Task HandleFilterKeyDown(KeyboardEventArgs eventArgs)
+    {
+        if (eventArgs.Key == "Enter" && !isLoading)
+        {
+            await ApplyFiltersAsync();
+        }
+    }
+
+    private async Task ToggleComparisonAsync(ChangeEventArgs eventArgs)
+    {
+        if (isLoading)
+        {
+            return;
+        }
+
+        compareWithCumulative = eventArgs.Value is bool isChecked && isChecked;
+        if (!compareWithCumulative)
+        {
+            filters.ComparisonFilter = ReportDetailComparisonFilter.All;
+        }
+
+        await LoadAsync(1);
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        filters = new MonthlyAnalysisFilter();
+        await LoadAsync(1);
+    }
+
+    private void ToggleFilterPanel() => isFilterPanelExpanded = !isFilterPanelExpanded;
+    private void OpenFieldSelector() => isFieldSelectorOpen = true;
+    private void CloseFieldSelector() => isFieldSelectorOpen = false;
+
+    private void ToggleField(string fieldKey, ChangeEventArgs eventArgs)
+    {
+        if (eventArgs.Value is bool isChecked && isChecked)
+        {
+            selectedFieldKeys.Add(fieldKey);
+            return;
+        }
+
+        selectedFieldKeys.Remove(fieldKey);
+    }
+
+    private void SelectAllFields()
+    {
+        foreach (var field in fields)
+        {
+            selectedFieldKeys.Add(field.Key);
+        }
+    }
+
+    private void ResetDefaultFields()
+    {
+        selectedFieldKeys.Clear();
+        foreach (var fieldKey in defaultFieldKeys)
+        {
+            selectedFieldKeys.Add(fieldKey);
+        }
+    }
+
+    private static string GetWasteRowClass(MonthlyAnalysisItem item) =>
+        item.WasteRate is < 0m || item.WasteAmount is < 0m ? "waste-loss-row" : string.Empty;
+
+    private string? GetWasteRowStyle(MonthlyAnalysisItem item)
+    {
+        if (item.WasteRate is not < 0m && item.WasteAmount is not < 0m)
+        {
+            return null;
+        }
+
+        var wasteMagnitude = Math.Abs(item.WasteRate ?? 0m);
+        var progress = maxVisibleWasteMagnitude > 0m
+            ? Math.Min(wasteMagnitude / maxVisibleWasteMagnitude, 1m)
+            : 0.2m;
+        var backgroundAlpha = 0.035m + (0.185m * progress);
+        var accentAlpha = Math.Min(0.25m + (0.55m * progress), 0.80m);
+
+        return FormattableString.Invariant(
+            $"--waste-background-alpha: {backgroundAlpha:F3}; --waste-accent-alpha: {accentAlpha:F3}");
+    }
+
+    private static string FormatField(AnalysisField field, MonthlyAnalysisItem? item) =>
+        item is null ? "–" : field.GetValue(item);
+    private static string FormatMonth(DateOnly date) =>
+        date.ToDateTime(TimeOnly.MinValue).ToString("MMMM yyyy", TurkishCulture);
     private static string FormatNumber(decimal? value) => value?.ToString("N2", TurkishCulture) ?? "–";
-    private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value.Value.ToString("N2", TurkishCulture)}";
+    private static string FormatRate(decimal? value) => value is null
+        ? "–"
+        : $"% {value.Value.ToString("N2", TurkishCulture)}";
+    private static int CountFilter(string? value) => string.IsNullOrWhiteSpace(value) ? 0 : 1;
+    private static bool HasFilters(MonthlyAnalysisFilter value) =>
+        !string.IsNullOrWhiteSpace(value.SearchText) ||
+        value.Year.HasValue ||
+        value.Month.HasValue ||
+        value.WasteFilter != ReportDetailWasteFilter.All ||
+        value.ComparisonFilter != ReportDetailComparisonFilter.All ||
+        value.MinimumWasteRate.HasValue ||
+        value.MaximumWasteRate.HasValue;
+
+    private static MonthlyAnalysisFilter CloneFilters(MonthlyAnalysisFilter value) => new()
+    {
+        SearchText = value.SearchText,
+        Year = value.Year,
+        Month = value.Month,
+        WasteFilter = value.WasteFilter,
+        ComparisonFilter = value.ComparisonFilter,
+        MinimumWasteRate = value.MinimumWasteRate,
+        MaximumWasteRate = value.MaximumWasteRate,
+        Sort = value.Sort
+    };
 
     public ValueTask DisposeAsync()
     {
@@ -192,4 +611,9 @@
         GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
     }
+
+    private sealed record AnalysisField(
+        string Key,
+        string Label,
+        Func<MonthlyAnalysisItem, string> GetValue);
 }

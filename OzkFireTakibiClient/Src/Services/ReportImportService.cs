@@ -256,36 +256,165 @@ public sealed class ReportImportService(
     /// <summary>
     /// Analiz ekranı için aktif aylık raporları Excel'deki genel sonuç satırıyla birlikte getirir.
     /// </summary>
-    public async Task<IReadOnlyList<MonthlyAnalysisItem>> GetMonthlyAnalysesAsync(
+    public async Task<MonthlyAnalysisResult> GetMonthlyAnalysesAsync(
+        MonthlyAnalysisFilter? filters,
+        int pageNumber,
+        int pageSize,
+        bool includeComparison,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated(user);
 
+        pageSize = Math.Clamp(pageSize, 10, 100);
+        pageNumber = Math.Max(1, pageNumber);
+        var normalizedFilters = NormalizeMonthlyAnalysisFilters(filters);
+
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await dbContext.ReportRows
+        var availableYears = await dbContext.ReportImports
             .AsNoTracking()
+            .Where(item => item.PeriodType == ReportPeriodType.Monthly && item.IsActive)
+            .Select(item => item.EndDate.Year)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToArrayAsync(cancellationToken);
+
+        var hasComparisonData = await dbContext.ReportPeriods
+            .AsNoTracking()
+            .AnyAsync(period =>
+                period.Imports.Any(item => item.PeriodType == ReportPeriodType.Monthly && item.IsActive) &&
+                period.Imports.Any(item => item.PeriodType == ReportPeriodType.Cumulative && item.IsActive),
+                cancellationToken);
+
+        includeComparison = includeComparison && hasComparisonData;
+        if (!includeComparison)
+        {
+            normalizedFilters.ComparisonFilter = ReportDetailComparisonFilter.All;
+        }
+
+        var query = dbContext.ReportRows
+            .AsNoTracking()
+            .Include(row => row.ReportImport)
             .Where(row =>
                 row.RowType == ReportRowType.General &&
                 row.ReportImport.PeriodType == ReportPeriodType.Monthly &&
-                row.ReportImport.IsActive)
-            .OrderByDescending(row => row.ReportImport.EndDate)
-            .ThenBy(row => row.ReportImport.OriginalFileName)
-            .Select(row => new MonthlyAnalysisItem
-            {
-                ImportId = row.ReportImportId,
-                OriginalFileName = row.ReportImport.OriginalFileName,
-                StartDate = row.ReportImport.StartDate,
-                EndDate = row.ReportImport.EndDate,
-                StoreSalesAmount = row.StoreSalesAmount,
-                CostOfSales = row.CostOfSales,
-                WasteRate = row.WasteRate,
-                WasteQuantity = row.WasteQuantity,
-                WasteAmount = row.WasteAmount,
-                ProfitRate = row.ProfitRate,
-                ProfitAmount = row.ProfitAmount
-            })
+                row.ReportImport.IsActive);
+
+        if (normalizedFilters.SearchText.Length > 0)
+        {
+            var searchText = normalizedFilters.SearchText;
+            query = query.Where(row => row.ReportImport.OriginalFileName.Contains(searchText));
+        }
+
+        if (normalizedFilters.Year.HasValue)
+        {
+            query = query.Where(row => row.ReportImport.EndDate.Year == normalizedFilters.Year.Value);
+        }
+
+        if (normalizedFilters.Month.HasValue)
+        {
+            query = query.Where(row => row.ReportImport.EndDate.Month == normalizedFilters.Month.Value);
+        }
+
+        query = normalizedFilters.WasteFilter switch
+        {
+            ReportDetailWasteFilter.Loss => query.Where(row => row.WasteRate < 0m || row.WasteAmount < 0m),
+            ReportDetailWasteFilter.NoLoss => query.Where(row =>
+                (row.WasteRate == null || row.WasteRate >= 0m) &&
+                (row.WasteAmount == null || row.WasteAmount >= 0m) &&
+                (row.WasteRate != null || row.WasteAmount != null)),
+            _ => query
+        };
+
+        if (normalizedFilters.MinimumWasteRate.HasValue)
+        {
+            query = query.Where(row => row.WasteRate >= normalizedFilters.MinimumWasteRate.Value);
+        }
+
+        if (normalizedFilters.MaximumWasteRate.HasValue)
+        {
+            query = query.Where(row => row.WasteRate <= normalizedFilters.MaximumWasteRate.Value);
+        }
+
+        if (normalizedFilters.ComparisonFilter == ReportDetailComparisonFilter.WorseThanCumulative)
+        {
+            query = query.Where(monthly =>
+                monthly.WasteRate < 0m &&
+                dbContext.ReportRows.Any(cumulative =>
+                    cumulative.RowType == ReportRowType.General &&
+                    cumulative.ReportImport.PeriodType == ReportPeriodType.Cumulative &&
+                    cumulative.ReportImport.IsActive &&
+                    cumulative.ReportImport.ReportPeriodId == monthly.ReportImport.ReportPeriodId &&
+                    cumulative.WasteRate != null &&
+                    monthly.WasteRate < cumulative.WasteRate));
+        }
+
+        var totalRowCount = await query.CountAsync(cancellationToken);
+        var totalPageCount = Math.Max(1, (int)Math.Ceiling(totalRowCount / (double)pageSize));
+        pageNumber = Math.Min(pageNumber, totalPageCount);
+
+        var orderedQuery = normalizedFilters.Sort switch
+        {
+            MonthlyAnalysisSort.OldestPeriod => query
+                .OrderBy(row => row.ReportImport.EndDate)
+                .ThenBy(row => row.ReportImport.OriginalFileName),
+            MonthlyAnalysisSort.WorstWasteRate => query
+                .OrderBy(row => row.WasteRate == null)
+                .ThenBy(row => row.WasteRate)
+                .ThenByDescending(row => row.ReportImport.EndDate),
+            MonthlyAnalysisSort.WorstWasteAmount => query
+                .OrderBy(row => row.WasteAmount == null)
+                .ThenBy(row => row.WasteAmount)
+                .ThenByDescending(row => row.ReportImport.EndDate),
+            MonthlyAnalysisSort.HighestSalesAmount => query
+                .OrderBy(row => row.StoreSalesAmount == null)
+                .ThenByDescending(row => row.StoreSalesAmount)
+                .ThenByDescending(row => row.ReportImport.EndDate),
+            _ => query
+                .OrderByDescending(row => row.ReportImport.EndDate)
+                .ThenBy(row => row.ReportImport.OriginalFileName)
+        };
+
+        var rows = await orderedQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToArrayAsync(cancellationToken);
+
+        IReadOnlyDictionary<long, ReportRowEntity> comparisonRows =
+            new Dictionary<long, ReportRowEntity>();
+        if (includeComparison && rows.Length > 0)
+        {
+            var reportPeriodIds = rows
+                .Select(row => row.ReportImport.ReportPeriodId)
+                .Distinct()
+                .ToArray();
+            comparisonRows = (await dbContext.ReportRows
+                    .AsNoTracking()
+                    .Include(row => row.ReportImport)
+                    .Where(row =>
+                        row.RowType == ReportRowType.General &&
+                        row.ReportImport.PeriodType == ReportPeriodType.Cumulative &&
+                        row.ReportImport.IsActive &&
+                        reportPeriodIds.Contains(row.ReportImport.ReportPeriodId))
+                    .ToArrayAsync(cancellationToken))
+                .ToDictionary(row => row.ReportImport.ReportPeriodId);
+        }
+
+        return new MonthlyAnalysisResult
+        {
+            Filters = normalizedFilters,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalRowCount = totalRowCount,
+            AvailableYears = availableYears,
+            HasComparisonData = hasComparisonData,
+            IncludeComparison = includeComparison,
+            Rows = rows.Select(row =>
+            {
+                comparisonRows.TryGetValue(row.ReportImport.ReportPeriodId, out var comparisonRow);
+                return CreateMonthlyAnalysisItem(row, comparisonRow);
+            }).ToArray()
+        };
     }
 
     /// <summary>
@@ -630,6 +759,53 @@ public sealed class ReportImportService(
             throw new UnauthorizedAccessException("Rapor silmek için Admin yetkisi gereklidir.");
         }
     }
+
+    private static MonthlyAnalysisFilter NormalizeMonthlyAnalysisFilters(MonthlyAnalysisFilter? filters)
+    {
+        filters ??= new MonthlyAnalysisFilter();
+        var minimumWasteRate = filters.MinimumWasteRate;
+        var maximumWasteRate = filters.MaximumWasteRate;
+        if (minimumWasteRate.HasValue && maximumWasteRate.HasValue && minimumWasteRate > maximumWasteRate)
+        {
+            (minimumWasteRate, maximumWasteRate) = (maximumWasteRate, minimumWasteRate);
+        }
+
+        return new MonthlyAnalysisFilter
+        {
+            SearchText = NormalizeFilterText(filters.SearchText, 100),
+            Year = filters.Year is >= 1 and <= 9999 ? filters.Year : null,
+            Month = filters.Month is >= 1 and <= 12 ? filters.Month : null,
+            WasteFilter = Enum.IsDefined(filters.WasteFilter)
+                ? filters.WasteFilter
+                : ReportDetailWasteFilter.All,
+            ComparisonFilter = Enum.IsDefined(filters.ComparisonFilter)
+                ? filters.ComparisonFilter
+                : ReportDetailComparisonFilter.All,
+            MinimumWasteRate = minimumWasteRate,
+            MaximumWasteRate = maximumWasteRate,
+            Sort = Enum.IsDefined(filters.Sort)
+                ? filters.Sort
+                : MonthlyAnalysisSort.NewestPeriod
+        };
+    }
+
+    private static MonthlyAnalysisItem CreateMonthlyAnalysisItem(
+        ReportRowEntity row,
+        ReportRowEntity? comparisonRow = null) => new()
+    {
+        ImportId = row.ReportImportId,
+        OriginalFileName = row.ReportImport.OriginalFileName,
+        StartDate = row.ReportImport.StartDate,
+        EndDate = row.ReportImport.EndDate,
+        StoreSalesAmount = row.StoreSalesAmount,
+        CostOfSales = row.CostOfSales,
+        WasteRate = row.WasteRate,
+        WasteQuantity = row.WasteQuantity,
+        WasteAmount = row.WasteAmount,
+        ProfitRate = row.ProfitRate,
+        ProfitAmount = row.ProfitAmount,
+        Comparison = comparisonRow is null ? null : CreateMonthlyAnalysisItem(comparisonRow)
+    };
 
     private static ReportDetailFilter NormalizeDetailFilters(ReportDetailFilter? filters, ReportRowType rowType)
     {

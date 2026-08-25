@@ -1,13 +1,13 @@
 @*
-    Rapor Detay ve Analiz Sayfası (RaporDetay.razor)
+    Analiz Detay Sayfası (RaporDetay.razor)
     - Rapor genel metrikleri ve özet kartları (ciro, maliyet, fire oranı, kâr oranı)
-    - Satır kırılım sekmeleri (Genel, Kategori Özeti, Mağaza Özeti, Mağaza x Kategori, Ürün Özeti, Mağaza x Ürün)
+    - Satır kırılım sekmeleri (Kategori Özeti, Mağaza Özeti, Mağaza x Kategori, Ürün Özeti, Mağaza x Ürün)
     - Sütun/alan seçici modal (gösterilecek Excel alanlarını özelleştirme)
     - Canlı metin arama ve sunucu taraflı sayfalama
     - Kümülatif rapor ile yan yana karşılaştırma modu
 *@
 
-@page "/raporlar/{ImportId:long}"
+@page "/analizler/{ImportId:long}"
 @inherits AuthRequiredComponent
 @implements IAsyncDisposable
 @inject ReportImportService ReportImportService
@@ -16,12 +16,12 @@
 @inject IOptions<ExcuseOptions> ExcuseOptions
 @using OzkFireTakibiClient.Src.Data.Entities
 
-<PageTitle>Rapor Detayı</PageTitle>
+<PageTitle>Analiz Detayı</PageTitle>
 
 
 <div class="container">
     <div class="mb-5">
-        <NavLink class="button is-light is-small mb-4" href="analizler">
+        <NavLink class="button is-light is-small mb-4" href="/analizler">
             <span class="icon"><i class="fas fa-arrow-left"></i></span>
             <span>Analizlere dön</span>
         </NavLink>
@@ -32,12 +32,15 @@
                 <div class="level-left">
                     <div>
                         <div class="is-flex is-align-items-center mb-2">
-                            <h1 class="title is-3 mb-0">Rapor detayı</h1>
+                            <h1 class="title is-3 mb-0">Analiz detayı</h1>
                             <span class="tag ml-3 @(detail.Header.IsActive ? "is-success is-light" : "is-light")">
                                 @(detail.Header.IsActive ? "Aktif sürüm" : "Eski sürüm")
                             </span>
                         </div>
-                        <p class="subtitle is-6 has-text-grey">@detail.Header.OriginalFileName</p>
+                        <p class="subtitle is-6 has-text-grey mb-1">@detail.Header.OriginalFileName</p>
+                        <p class="is-size-7 has-text-grey">
+                            @detail.Header.StartDate.ToString("dd.MM.yyyy") – @detail.Header.EndDate.ToString("dd.MM.yyyy")
+                        </p>
                     </div>
                 </div>
             </div>
@@ -65,80 +68,6 @@
     }
     else if (detail is not null)
     {
-        <section class="box mb-5" aria-labelledby="report-info-title">
-            <div class="level is-mobile @(isReportInfoExpanded ? "mb-4" : "mb-0")">
-                <div class="level-left">
-                    <h2 id="report-info-title" class="title is-5 mb-0">Rapor bilgileri</h2>
-                </div>
-                <div class="level-right">
-                    <button class="button is-small is-light"
-                            type="button"
-                            aria-expanded="@isReportInfoExpanded"
-                            aria-controls="report-info-content"
-                            @onclick="ToggleReportInfo">
-                        <span class="icon">
-                            <i class="fas @(isReportInfoExpanded ? "fa-chevron-up" : "fa-chevron-down")"></i>
-                        </span>
-                        <span>@(isReportInfoExpanded ? "Daralt" : "Genişlet")</span>
-                    </button>
-                </div>
-            </div>
-            @if (isReportInfoExpanded)
-            {
-                <div id="report-info-content" class="columns is-multiline">
-                <div class="column is-one-quarter">
-                    <p class="heading">Rapor türü</p>
-                    <p class="has-text-weight-semibold">@ReportDisplayNames.PeriodType(detail.Header.PeriodType)</p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Dönem</p>
-                    <p class="has-text-weight-semibold">
-                        @detail.Header.StartDate.ToString("dd.MM.yyyy") – @detail.Header.EndDate.ToString("dd.MM.yyyy")
-                    </p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Toplam satır</p>
-                    <p class="has-text-weight-semibold">@detail.Header.TotalRowCount.ToString("N0")</p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Yükleyen</p>
-                    <p>@detail.Header.UploadedBy</p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Yüklenme zamanı</p>
-                    <p>@detail.Header.ImportedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Rapor No</p>
-                    <p>#@detail.Header.Id</p>
-                </div>
-                <div class="column is-one-quarter">
-                    <p class="heading">Bağlı dönem No</p>
-                    <p>#@detail.Header.ReportPeriodId</p>
-                </div>
-                @if (detail.Header.PeriodType == ReportPeriodType.Monthly)
-                {
-                    <div class="column is-full">
-                        <p class="heading">Kümülatif karşılaştırma kaynağı</p>
-                        @if (detail.Header.ComparisonSource is not null)
-                        {
-                            <p class="has-text-weight-semibold">@detail.Header.ComparisonSource.OriginalFileName</p>
-                            <p class="is-size-7 has-text-grey">
-                                @detail.Header.ComparisonSource.StartDate.ToString("dd.MM.yyyy") –
-                                @detail.Header.ComparisonSource.EndDate.ToString("dd.MM.yyyy") ·
-                                Rapor #@detail.Header.ComparisonSource.ImportId
-                            </p>
-                        }
-                        else
-                        {
-                            <span class="tag is-warning is-light">Bağlı kümülatif rapor bulunamadı</span>
-                        }
-                    </div>
-                }
-                </div>
-            }
-        </section>
-
         @if (detail.Header.GeneralSummary is not null)
         {
             <section class="box mb-5" aria-labelledby="summary-title">
@@ -270,8 +199,6 @@
                 </ul>
             </div>
 
-            @if (selectedRowType != ReportRowType.General)
-            {
             <section class="box mb-4" aria-labelledby="detail-filter-title">
                 <div class="level is-mobile mb-4">
                     <div class="level-left">
@@ -408,7 +335,6 @@
                     </button>
                 </div>
             </section>
-            }
 
             @if (isLoading)
             {
@@ -608,7 +534,9 @@
     public long ImportId { get; set; }
 
     private readonly CancellationTokenSource cancellationTokenSource = new();
-    private readonly ReportRowType[] rowTypes = Enum.GetValues<ReportRowType>();
+    private readonly ReportRowType[] rowTypes = Enum.GetValues<ReportRowType>()
+        .Where(rowType => rowType != ReportRowType.General)
+        .ToArray();
     private static readonly string[] importantMetricFieldKeys =
     [
         "storeSalesAmount",
@@ -663,7 +591,6 @@
     private string? successMessage;
     private bool isLoading;
     private bool compareWithCumulative;
-    private bool isReportInfoExpanded = true;
     private bool isGeneralSummaryExpanded = true;
     private bool isFieldSelectorOpen;
     private bool canRequestExcuses;
@@ -730,8 +657,6 @@
 
     private bool HasAppliedFilters => detail is not null &&
         (HasFilters(detail.Filters) || detail.Filters.Sort != ReportDetailSort.SourceOrder);
-
-    private void ToggleReportInfo() => isReportInfoExpanded = !isReportInfoExpanded;
 
     private void ToggleGeneralSummary() => isGeneralSummaryExpanded = !isGeneralSummaryExpanded;
 

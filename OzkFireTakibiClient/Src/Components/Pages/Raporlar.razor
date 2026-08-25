@@ -348,9 +348,9 @@
                                 <td>@item.ImportedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                                 <td>
                                     <div class="buttons are-small">
-                                        <NavLink class="button is-info is-light" href="@($"raporlar/{item.Id}")">
-                                            <span class="icon"><i class="fas fa-eye"></i></span>
-                                            <span>Detay</span>
+                                        <NavLink class="button is-info is-light" href="@($"/analizler/{item.Id}")">
+                                            <span class="icon"><i class="fas fa-chart-line"></i></span>
+                                            <span>Analiz</span>
                                         </NavLink>
                                         <AuthorizeView Policy="@ReportPolicies.CanDeleteReports">
                                             <Authorized>

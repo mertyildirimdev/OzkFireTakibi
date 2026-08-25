@@ -181,6 +181,48 @@ public sealed class MonthlyAnalysisItem
     public decimal? WasteAmount { get; init; }
     public decimal? ProfitRate { get; init; }
     public decimal? ProfitAmount { get; init; }
+    public MonthlyAnalysisItem? Comparison { get; init; }
+}
+
+/// <summary>
+/// Analizler sayfasındaki genel rapor tablosunun filtre, sayfalama ve karşılaştırma sonucunu içerir.
+/// </summary>
+public sealed class MonthlyAnalysisResult
+{
+    public required MonthlyAnalysisFilter Filters { get; init; }
+    public required int PageNumber { get; init; }
+    public required int PageSize { get; init; }
+    public required int TotalRowCount { get; init; }
+    public required IReadOnlyList<MonthlyAnalysisItem> Rows { get; init; }
+    public required IReadOnlyList<int> AvailableYears { get; init; }
+    public required bool HasComparisonData { get; init; }
+    public required bool IncludeComparison { get; init; }
+
+    public int TotalPageCount => Math.Max(1, (int)Math.Ceiling(TotalRowCount / (double)PageSize));
+}
+
+/// <summary>
+/// Aktif aylık raporların genel sonuç listesine uygulanan filtreler.
+/// </summary>
+public sealed class MonthlyAnalysisFilter
+{
+    public string SearchText { get; set; } = string.Empty;
+    public int? Year { get; set; }
+    public int? Month { get; set; }
+    public ReportDetailWasteFilter WasteFilter { get; set; }
+    public ReportDetailComparisonFilter ComparisonFilter { get; set; }
+    public decimal? MinimumWasteRate { get; set; }
+    public decimal? MaximumWasteRate { get; set; }
+    public MonthlyAnalysisSort Sort { get; set; }
+}
+
+public enum MonthlyAnalysisSort
+{
+    NewestPeriod,
+    OldestPeriod,
+    WorstWasteRate,
+    WorstWasteAmount,
+    HighestSalesAmount
 }
 
 /// <summary>
