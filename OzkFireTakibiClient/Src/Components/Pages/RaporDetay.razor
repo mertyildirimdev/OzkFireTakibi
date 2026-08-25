@@ -13,6 +13,7 @@
 @inject ReportImportService ReportImportService
 @inject ExcuseService ExcuseService
 @inject IAuthorizationService AuthorizationService
+@inject IOptions<ExcuseOptions> ExcuseOptions
 @using OzkFireTakibiClient.Src.Data.Entities
 
 <PageTitle>Rapor Detayı</PageTitle>
@@ -20,9 +21,9 @@
 
 <div class="container">
     <div class="mb-5">
-        <NavLink class="button is-light is-small mb-4" href="raporlar">
+        <NavLink class="button is-light is-small mb-4" href="analizler">
             <span class="icon"><i class="fas fa-arrow-left"></i></span>
-            <span>Raporlara dön</span>
+            <span>Analizlere dön</span>
         </NavLink>
 
         @if (detail is not null)
@@ -85,10 +86,6 @@
             @if (isReportInfoExpanded)
             {
                 <div id="report-info-content" class="columns is-multiline">
-                <div class="column is-one-quarter">
-                    <p class="heading">Kapsam</p>
-                    <p class="has-text-weight-semibold">@ReportDisplayNames.Scope(detail.Header.Scope)</p>
-                </div>
                 <div class="column is-one-quarter">
                     <p class="heading">Rapor türü</p>
                     <p class="has-text-weight-semibold">@ReportDisplayNames.PeriodType(detail.Header.PeriodType)</p>
@@ -165,7 +162,7 @@
                 @if (isGeneralSummaryExpanded)
                 {
                     <div id="general-summary-content" class="columns is-multiline">
-                    <div class="column is-one-third">
+                    <div class="column is-half-tablet is-one-quarter-desktop">
                         <p class="heading">Mağaza satış tutarı</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.StoreSalesAmount)</p>
                         @if (detail.IncludeComparison)
@@ -173,7 +170,7 @@
                             <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.StoreSalesAmount)</p>
                         }
                     </div>
-                    <div class="column is-one-third">
+                    <div class="column is-half-tablet is-one-quarter-desktop">
                         <p class="heading">Satış maliyeti</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.CostOfSales)</p>
                         @if (detail.IncludeComparison)
@@ -181,31 +178,39 @@
                             <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.CostOfSales)</p>
                         }
                     </div>
-                    <div class="column is-one-third">
-                        <p class="heading">Fire</p>
+                    <div class="column is-half-tablet is-one-quarter-desktop">
+                        <p class="heading">Fire oranı</p>
                         <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.WasteRate)</p>
-                        <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.WasteAmount)</p>
                         @if (detail.IncludeComparison)
                         {
-                            <p class="is-size-7 has-text-info">
-                                Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.WasteRate) ·
-                                @FormatNumber(detail.Header.GeneralSummary.Comparison?.WasteAmount)
-                            </p>
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.WasteRate)</p>
                         }
                     </div>
-                    <div class="column is-one-third">
-                        <p class="heading">Kâr</p>
+                    <div class="column is-half-tablet is-one-quarter-desktop">
+                        <p class="heading">Fire tutarı</p>
+                        <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.WasteAmount)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.WasteAmount)</p>
+                        }
+                    </div>
+                    <div class="column is-half-tablet is-one-quarter-desktop">
+                        <p class="heading">Kâr oranı</p>
                         <p class="title is-5">@FormatRate(detail.Header.GeneralSummary.ProfitRate)</p>
-                        <p class="is-size-7 has-text-grey">@FormatNumber(detail.Header.GeneralSummary.ProfitAmount)</p>
                         @if (detail.IncludeComparison)
                         {
-                            <p class="is-size-7 has-text-info">
-                                Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.ProfitRate) ·
-                                @FormatNumber(detail.Header.GeneralSummary.Comparison?.ProfitAmount)
-                            </p>
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatRate(detail.Header.GeneralSummary.Comparison?.ProfitRate)</p>
                         }
                     </div>
-                    <div class="column is-one-third">
+                    <div class="column is-half-tablet is-one-quarter-desktop">
+                        <p class="heading">Kâr tutarı</p>
+                        <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.ProfitAmount)</p>
+                        @if (detail.IncludeComparison)
+                        {
+                            <p class="is-size-7 has-text-info">Kümülatif: @FormatNumber(detail.Header.GeneralSummary.Comparison?.ProfitAmount)</p>
+                        }
+                    </div>
+                    <div class="column is-half-tablet is-one-quarter-desktop">
                         <p class="heading">Fire miktarı</p>
                         <p class="title is-5">@FormatNumber(detail.Header.GeneralSummary.WasteQuantity)</p>
                         @if (detail.IncludeComparison)
@@ -349,6 +354,19 @@
                         </div>
                     </div>
 
+                    @if (detail.IncludeComparison)
+                    {
+                        <div class="column is-6-tablet is-3-desktop">
+                            <label class="label is-small" for="comparison-filter">Kümülatif karşılaştırma</label>
+                            <div class="select is-small is-fullwidth">
+                                <select id="comparison-filter" @bind="filters.ComparisonFilter">
+                                    <option value="@ReportDetailComparisonFilter.All">Tümü</option>
+                                    <option value="@ReportDetailComparisonFilter.WorseThanCumulative">Kümülatiften daha yüksek fire</option>
+                                </select>
+                            </div>
+                        </div>
+                    }
+
                     <div class="column is-6-tablet is-2-desktop">
                         <label class="label is-small">Fire oranı (%)</label>
                         <div class="field has-addons">
@@ -402,6 +420,12 @@
             }
             else
             {
+                <div class="waste-scale-legend mb-2" aria-label="Fire renk göstergesi">
+                    <span class="waste-scale-swatch is-soft" aria-hidden="true"></span>
+                    <span class="waste-scale-swatch is-medium" aria-hidden="true"></span>
+                    <span class="waste-scale-swatch is-strong" aria-hidden="true"></span>
+                    <span>Fire büyüdükçe ve mazeret eşiğini aştıkça kırmızı ton koyulaşır.</span>
+                </div>
                 <div class="table-container report-rows-scroll">
                     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
                         <thead>
@@ -442,7 +466,7 @@
                         <tbody>
                             @foreach (var row in detail.Rows)
                             {
-                                <tr>
+                                <tr class="@GetWasteRowClass(row)" style="@GetWasteRowStyle(row)">
                                     <td>@row.SourceRowNumber</td>
                                     @if (detail.IncludeComparison)
                                     {
@@ -690,6 +714,7 @@
         CountFilter(ShowCategoryFilter ? filters.CategoryText : null) +
         CountFilter(ShowProductFilter ? filters.ProductText : null) +
         (filters.WasteFilter == ReportDetailWasteFilter.All ? 0 : 1) +
+        (filters.ComparisonFilter == ReportDetailComparisonFilter.All ? 0 : 1) +
         (filters.MinimumWasteRate.HasValue ? 1 : 0) +
         (filters.MaximumWasteRate.HasValue ? 1 : 0);
 
@@ -882,6 +907,7 @@
         !string.IsNullOrWhiteSpace(value.CategoryText) ||
         !string.IsNullOrWhiteSpace(value.ProductText) ||
         value.WasteFilter != ReportDetailWasteFilter.All ||
+        value.ComparisonFilter != ReportDetailComparisonFilter.All ||
         value.MinimumWasteRate.HasValue ||
         value.MaximumWasteRate.HasValue;
 
@@ -892,6 +918,7 @@
         CategoryText = value.CategoryText,
         ProductText = value.ProductText,
         WasteFilter = value.WasteFilter,
+        ComparisonFilter = value.ComparisonFilter,
         MinimumWasteRate = value.MinimumWasteRate,
         MaximumWasteRate = value.MaximumWasteRate,
         Sort = value.Sort
@@ -899,6 +926,32 @@
 
     private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
     private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value:N2}";
+
+    private static string? GetWasteRowClass(ReportDetailRowItem row) =>
+        row.WasteRate < 0m || row.WasteAmount < 0m ? "waste-loss-row" : null;
+
+    private string? GetWasteRowStyle(ReportDetailRowItem row)
+    {
+        if (row.WasteRate is not < 0m && row.WasteAmount is not < 0m)
+        {
+            return null;
+        }
+
+        var wasteMagnitude = Math.Abs(row.WasteRate ?? 0m);
+        var generalWasteMagnitude = Math.Abs(detail?.Header.GeneralSummary?.WasteRate ?? 0m);
+        var thresholdMultiplier = Math.Max(ExcuseOptions.Value.ThresholdMultiplier, 0m);
+        var thresholdMagnitude = generalWasteMagnitude * thresholdMultiplier;
+
+        var progress = thresholdMagnitude > 0m
+            ? Math.Min(wasteMagnitude / thresholdMagnitude, 2.5m) / 2.5m
+            : 0.2m;
+        var backgroundAlpha = 0.035m + (0.185m * progress);
+        var accentAlpha = Math.Min(0.25m + (0.55m * progress), 0.80m);
+
+        return FormattableString.Invariant(
+            $"--waste-background-alpha: {backgroundAlpha:F3}; --waste-accent-alpha: {accentAlpha:F3}");
+    }
+
     private string FormatField(DetailField field, ReportDetailRowItem? row)
     {
         if (row is null)

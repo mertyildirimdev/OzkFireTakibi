@@ -86,12 +86,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         var reportPeriod = modelBuilder.Entity<ReportPeriodEntity>();
         reportPeriod.ToTable("report_periods");
-        reportPeriod.Property(x => x.Scope).HasConversion<string>().HasMaxLength(40);
-        reportPeriod.HasIndex(x => new { x.Scope, x.EndDate }).IsUnique();
+        reportPeriod.Property(x => x.CategorySignature).HasMaxLength(64);
+        reportPeriod.HasIndex(x => new { x.CategorySignature, x.EndDate }).IsUnique();
 
         var reportImport = modelBuilder.Entity<ReportImportEntity>();
         reportImport.ToTable("report_imports");
-        reportImport.Property(x => x.Scope).HasConversion<string>().HasMaxLength(40);
         reportImport.Property(x => x.PeriodType).HasConversion<string>().HasMaxLength(20);
         reportImport.Property(x => x.OriginalFileName).HasMaxLength(260);
         reportImport.Property(x => x.FileHash).HasMaxLength(64);

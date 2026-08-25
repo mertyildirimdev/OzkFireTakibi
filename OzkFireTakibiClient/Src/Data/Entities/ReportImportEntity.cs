@@ -11,11 +11,6 @@ public class ReportImportEntity : BaseEntity<long>
     public long ReportPeriodId { get; set; }
 
     /// <summary>
-    /// Raporun ürün grubu kapsamı (Delicatessen / NutsAndDriedFruit)
-    /// </summary>
-    public ReportScope Scope { get; set; }
-
-    /// <summary>
     /// Raporun dönem türü (Monthly / Cumulative)
     /// </summary>
     public ReportPeriodType PeriodType { get; set; }
@@ -100,22 +95,6 @@ public class ReportImportEntity : BaseEntity<long>
     /// </summary>
     public ICollection<ReportRowEntity> Rows { get; set; } = new List<ReportRowEntity>();
 
-}
-
-/// <summary>
-/// Raporun ürün grubu kapsamı.
-/// </summary>
-public enum ReportScope
-{
-    /// <summary>
-    /// Şarküteri ürün grubu (Kategori kodları 12.x ile başlayanlar)
-    /// </summary>
-    Delicatessen,
-
-    /// <summary>
-    /// Kuruyemiş ve Kuru Meyve ürün grubu (Kategori kodları 15.x ile başlayanlar)
-    /// </summary>
-    NutsAndDriedFruit
 }
 
 /// <summary>

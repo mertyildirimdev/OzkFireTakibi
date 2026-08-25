@@ -9,7 +9,7 @@ using OzkFireTakibiClient.Src.Data.Entities;
 namespace OzkFireTakibiClient.Src.ReportImports;
 
 /// <summary>
-/// Şarküteri ve Kuruyemiş/Kuru Meyve yangın/fire takip Excel raporlarını (.xls, .xlsx) ayrıştıran,
+/// Fire takip Excel raporlarını (.xls, .xlsx) ayrıştıran,
 /// doğrulayan ve yapılandırılmış veri modellerine dönüştüren ayrıştırıcı servis.
 /// </summary>
 public sealed partial class ReportImportParser
@@ -89,7 +89,7 @@ public sealed partial class ReportImportParser
             return new ParsedReport
             {
                 FileHash = hash,
-                Scope = ResolveScope(rows),
+                CategorySignature = CreateCategorySignature(rows),
                 PeriodType = periodType,
                 StartDate = startDate,
                 EndDate = endDate,
@@ -429,28 +429,21 @@ public sealed partial class ReportImportParser
     }
 
     /// <summary>
-    /// Kategori kodlarının ön ekine göre rapor kapsamını belirler (12.x -> Şarküteri, 15.x -> Kuruyemiş/Kuru Meyve).
+    /// Rapor çiftlerini gerçek Excel içeriğiyle eşleştirmek için kategori kodlarından kararlı bir imza üretir.
     /// </summary>
-    private static ReportScope ResolveScope(IReadOnlyList<ParsedReportRow> rows)
+    private static string CreateCategorySignature(IReadOnlyList<ParsedReportRow> rows)
     {
         var categoryCodes = rows
             .Where(row => row.RowType == ReportRowType.CategorySummary)
             .Select(row => RequireKey(row.CategoryCode, "Kategori Kodu", row.SourceRowNumber))
+            .Select(code => code.Trim().ToUpperInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (categoryCodes.All(code => code.StartsWith("12.", StringComparison.Ordinal)))
-        {
-            return ReportScope.Delicatessen;
-        }
-
-        if (categoryCodes.All(code => code.StartsWith("15.", StringComparison.Ordinal)))
-        {
-            return ReportScope.NutsAndDriedFruit;
-        }
-
-        throw new ReportImportValidationException(
-            $"Rapor kapsamı kategori kodlarından belirlenemedi: {string.Join(", ", categoryCodes)}.");
+        var canonicalCategorySet = string.Join('\u001F', categoryCodes);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalCategorySet)))
+            .ToLowerInvariant();
     }
 
     private static bool IsEmptyRow(IExcelDataReader reader)

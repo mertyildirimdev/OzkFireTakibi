@@ -54,7 +54,8 @@ public sealed class ReportImportService(
         var reportPeriod = await dbContext.ReportPeriods
             .AsNoTracking()
             .SingleOrDefaultAsync(period =>
-                period.Scope == monthlyReport.Scope && period.EndDate == monthlyReport.EndDate,
+                period.CategorySignature == monthlyReport.CategorySignature &&
+                period.EndDate == monthlyReport.EndDate,
                 cancellationToken);
 
         var activeImports = Array.Empty<ReportImportEntity>();
@@ -79,7 +80,6 @@ public sealed class ReportImportService(
 
         return new ReportPairImportPreview
         {
-            Scope = monthlyReport.Scope,
             EndDate = monthlyReport.EndDate,
             MonthlyReport = CreatePairFilePreview(
                 monthlyReport,
@@ -124,14 +124,15 @@ public sealed class ReportImportService(
 
         var reportPeriod = await dbContext.ReportPeriods
             .SingleOrDefaultAsync(period =>
-                period.Scope == monthlyReport.Scope && period.EndDate == monthlyReport.EndDate,
+                period.CategorySignature == monthlyReport.CategorySignature &&
+                period.EndDate == monthlyReport.EndDate,
                 cancellationToken);
 
         if (reportPeriod is null)
         {
             reportPeriod = new ReportPeriodEntity
             {
-                Scope = monthlyReport.Scope,
+                CategorySignature = monthlyReport.CategorySignature,
                 EndDate = monthlyReport.EndDate,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -209,7 +210,6 @@ public sealed class ReportImportService(
                 Id = reportImport.Id,
                 ReportPeriodId = reportImport.ReportPeriodId,
                 OriginalFileName = reportImport.OriginalFileName,
-                Scope = reportImport.Scope,
                 PeriodType = reportImport.PeriodType,
                 StartDate = reportImport.StartDate,
                 EndDate = reportImport.EndDate,
@@ -240,18 +240,52 @@ public sealed class ReportImportService(
             .AsNoTracking()
             .Include(period => period.Imports.Where(reportImport => reportImport.IsActive))
             .OrderByDescending(period => period.EndDate)
-            .ThenBy(period => period.Scope)
+            .ThenBy(period => period.Id)
             .Take(historyPageSize)
             .ToListAsync(cancellationToken);
 
         return periods.Select(period => new ReportPeriodOverviewItem
         {
             Id = period.Id,
-            Scope = period.Scope,
             EndDate = period.EndDate,
             MonthlyReport = CreatePeriodFileItem(period.Imports, ReportPeriodType.Monthly),
             CumulativeReport = CreatePeriodFileItem(period.Imports, ReportPeriodType.Cumulative)
         }).ToArray();
+    }
+
+    /// <summary>
+    /// Analiz ekranı için aktif aylık raporları Excel'deki genel sonuç satırıyla birlikte getirir.
+    /// </summary>
+    public async Task<IReadOnlyList<MonthlyAnalysisItem>> GetMonthlyAnalysesAsync(
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated(user);
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.ReportRows
+            .AsNoTracking()
+            .Where(row =>
+                row.RowType == ReportRowType.General &&
+                row.ReportImport.PeriodType == ReportPeriodType.Monthly &&
+                row.ReportImport.IsActive)
+            .OrderByDescending(row => row.ReportImport.EndDate)
+            .ThenBy(row => row.ReportImport.OriginalFileName)
+            .Select(row => new MonthlyAnalysisItem
+            {
+                ImportId = row.ReportImportId,
+                OriginalFileName = row.ReportImport.OriginalFileName,
+                StartDate = row.ReportImport.StartDate,
+                EndDate = row.ReportImport.EndDate,
+                StoreSalesAmount = row.StoreSalesAmount,
+                CostOfSales = row.CostOfSales,
+                WasteRate = row.WasteRate,
+                WasteQuantity = row.WasteQuantity,
+                WasteAmount = row.WasteAmount,
+                ProfitRate = row.ProfitRate,
+                ProfitAmount = row.ProfitAmount
+            })
+            .ToArrayAsync(cancellationToken);
     }
 
     /// <summary>
@@ -293,6 +327,10 @@ public sealed class ReportImportService(
         }
 
         includeComparison = includeComparison && comparisonImport is not null;
+        if (!includeComparison)
+        {
+            normalizedFilters.ComparisonFilter = ReportDetailComparisonFilter.All;
+        }
 
         var generalRow = await dbContext.ReportRows
             .AsNoTracking()
@@ -374,6 +412,18 @@ public sealed class ReportImportService(
             query = query.Where(row => row.WasteRate <= normalizedFilters.MaximumWasteRate.Value);
         }
 
+        if (normalizedFilters.ComparisonFilter == ReportDetailComparisonFilter.WorseThanCumulative)
+        {
+            var comparisonQuery = dbContext.ReportRows
+                .AsNoTracking()
+                .Where(row =>
+                    row.ReportImportId == comparisonImport!.Id &&
+                    row.RowType == rowType &&
+                    row.WasteRate != null);
+
+            query = ApplyComparisonWasteFilter(query, comparisonQuery, rowType);
+        }
+
         var totalRowCount = await query.CountAsync(cancellationToken);
         var totalPageCount = Math.Max(1, (int)Math.Ceiling(totalRowCount / (double)pageSize));
         pageNumber = Math.Min(pageNumber, totalPageCount);
@@ -418,7 +468,6 @@ public sealed class ReportImportService(
                 Id = reportImport.Id,
                 ReportPeriodId = reportImport.ReportPeriodId,
                 OriginalFileName = reportImport.OriginalFileName,
-                Scope = reportImport.Scope,
                 PeriodType = reportImport.PeriodType,
                 StartDate = reportImport.StartDate,
                 EndDate = reportImport.EndDate,
@@ -613,11 +662,52 @@ public sealed class ReportImportService(
             WasteFilter = Enum.IsDefined(filters.WasteFilter)
                 ? filters.WasteFilter
                 : ReportDetailWasteFilter.All,
+            ComparisonFilter = Enum.IsDefined(filters.ComparisonFilter)
+                ? filters.ComparisonFilter
+                : ReportDetailComparisonFilter.All,
             MinimumWasteRate = minimumWasteRate,
             MaximumWasteRate = maximumWasteRate,
             Sort = Enum.IsDefined(filters.Sort)
                 ? filters.Sort
                 : ReportDetailSort.SourceOrder
+        };
+    }
+
+    private static IQueryable<ReportRowEntity> ApplyComparisonWasteFilter(
+        IQueryable<ReportRowEntity> monthlyRows,
+        IQueryable<ReportRowEntity> cumulativeRows,
+        ReportRowType rowType)
+    {
+        monthlyRows = monthlyRows.Where(monthly => monthly.WasteRate < 0m);
+
+        return rowType switch
+        {
+            ReportRowType.General => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative => monthly.WasteRate < cumulative.WasteRate)),
+            ReportRowType.CategorySummary => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative =>
+                    cumulative.CategoryCode == monthly.CategoryCode &&
+                    monthly.WasteRate < cumulative.WasteRate)),
+            ReportRowType.StoreSummary => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative =>
+                    cumulative.StoreNumber == monthly.StoreNumber &&
+                    monthly.WasteRate < cumulative.WasteRate)),
+            ReportRowType.StoreCategory => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative =>
+                    cumulative.StoreNumber == monthly.StoreNumber &&
+                    cumulative.CategoryCode == monthly.CategoryCode &&
+                    monthly.WasteRate < cumulative.WasteRate)),
+            ReportRowType.ProductSummary => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative =>
+                    cumulative.StockCode == monthly.StockCode &&
+                    monthly.WasteRate < cumulative.WasteRate)),
+            ReportRowType.StoreProduct => monthlyRows.Where(monthly =>
+                cumulativeRows.Any(cumulative =>
+                    cumulative.StoreNumber == monthly.StoreNumber &&
+                    cumulative.CategoryCode == monthly.CategoryCode &&
+                    cumulative.StockCode == monthly.StockCode &&
+                    monthly.WasteRate < cumulative.WasteRate)),
+            _ => monthlyRows
         };
     }
 
@@ -702,10 +792,13 @@ public sealed class ReportImportService(
 
     private static void ValidatePair(ParsedReport monthlyReport, ParsedReport cumulativeReport)
     {
-        if (monthlyReport.Scope != cumulativeReport.Scope)
+        if (!string.Equals(
+                monthlyReport.CategorySignature,
+                cumulativeReport.CategorySignature,
+                StringComparison.Ordinal))
         {
             throw new ReportImportValidationException(
-                "Aylık ve kümülatif Excel aynı ürün grubuna ait olmalıdır.");
+                "Aylık ve kümülatif Excel'lerdeki kategori kodları aynı olmalıdır.");
         }
 
         if (monthlyReport.EndDate != cumulativeReport.EndDate)
@@ -744,7 +837,6 @@ public sealed class ReportImportService(
 
         if (reportPeriod is null ||
             existingImport.ReportPeriodId != reportPeriod.Id ||
-            existingImport.Scope != report.Scope ||
             existingImport.PeriodType != report.PeriodType ||
             existingImport.EndDate != report.EndDate)
         {
@@ -815,7 +907,6 @@ public sealed class ReportImportService(
         var reportImport = new ReportImportEntity
         {
             ReportPeriodId = reportPeriod.Id,
-            Scope = report.Scope,
             PeriodType = report.PeriodType,
             StartDate = report.StartDate,
             EndDate = report.EndDate,

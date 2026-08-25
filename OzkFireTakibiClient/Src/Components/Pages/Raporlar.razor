@@ -61,7 +61,7 @@
                 </div>
 
                 <div class="notification is-info is-light">
-                    İki Excel'in ürün grubu ve dönem sonu aynı olmalıdır. Önceki ay karşılaştırmaları yalnızca kümülatif Excel'den okunur; uygulama ara değer hesaplamaz.
+                    İki Excel'in kategori kodları ve dönem sonu aynı olmalıdır. Önceki ay karşılaştırmaları yalnızca kümülatif Excel'den okunur; uygulama ara değer hesaplamaz.
                 </div>
 
                 <div class="columns">
@@ -120,7 +120,7 @@
                                 <div>
                                     <h3 class="title is-6 mb-1">Rapor paketi önizlemesi</h3>
                                     <p class="is-size-7 has-text-grey">
-                                        @ReportDisplayNames.Scope(pairPreview.Scope) · dönem sonu @pairPreview.EndDate.ToString("dd.MM.yyyy")
+                                        Dönem sonu @pairPreview.EndDate.ToString("dd.MM.yyyy")
                                     </p>
                                 </div>
                             </div>
@@ -238,7 +238,6 @@
                 <table class="table is-fullwidth is-hoverable">
                     <thead>
                         <tr>
-                            <th>Kapsam</th>
                             <th>Dönem sonu</th>
                             <th>Aylık kesinleşen</th>
                             <th>Kümülatif karşılaştırma</th>
@@ -249,7 +248,6 @@
                         @foreach (var period in reportPeriods)
                         {
                             <tr>
-                                <td>@ReportDisplayNames.Scope(period.Scope)</td>
                                 <td>@period.EndDate.ToString("dd.MM.yyyy")</td>
                                 <td>
                                     @if (period.MonthlyReport is not null)
@@ -324,7 +322,6 @@
                     <thead>
                         <tr>
                             <th>Durum</th>
-                            <th>Kapsam</th>
                             <th>Dönem</th>
                             <th>Tip</th>
                             <th>Dosya</th>
@@ -343,7 +340,6 @@
                                         @(item.IsActive ? "Aktif" : "Eski sürüm")
                                     </span>
                                 </td>
-                                <td>@ReportDisplayNames.Scope(item.Scope)</td>
                                 <td>@item.StartDate.ToString("dd.MM.yyyy") – @item.EndDate.ToString("dd.MM.yyyy")</td>
                                 <td>@ReportDisplayNames.PeriodType(item.PeriodType)</td>
                                 <td>@item.OriginalFileName</td>

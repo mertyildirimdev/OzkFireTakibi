@@ -13,9 +13,9 @@ public sealed class ParsedReport
     public required string FileHash { get; init; }
 
     /// <summary>
-    /// Raporun ürün grubu kapsamı (Şarküteri veya Kuruyemiş)
+    /// Kategori kodu kümesinin teknik eşleştirme imzası.
     /// </summary>
-    public required ReportScope Scope { get; init; }
+    public required string CategorySignature { get; init; }
 
     /// <summary>
     /// Raporun dönem tipi (Aylık kesinleşen veya Kümülatif)
@@ -90,7 +90,6 @@ public sealed class ParsedReportRow
 /// </summary>
 public sealed class ReportPairImportPreview
 {
-    public required ReportScope Scope { get; init; }
     public required DateOnly EndDate { get; init; }
     public required ReportPairFilePreview MonthlyReport { get; init; }
     public required ReportPairFilePreview CumulativeReport { get; init; }
@@ -130,7 +129,6 @@ public sealed class ReportImportHistoryItem
     public required long Id { get; init; }
     public required long ReportPeriodId { get; init; }
     public required string OriginalFileName { get; init; }
-    public required ReportScope Scope { get; init; }
     public required ReportPeriodType PeriodType { get; init; }
     public required DateOnly StartDate { get; init; }
     public required DateOnly EndDate { get; init; }
@@ -146,7 +144,6 @@ public sealed class ReportImportHistoryItem
 public sealed class ReportPeriodOverviewItem
 {
     public required long Id { get; init; }
-    public required ReportScope Scope { get; init; }
     public required DateOnly EndDate { get; init; }
     public ReportPeriodFileItem? MonthlyReport { get; init; }
     public ReportPeriodFileItem? CumulativeReport { get; init; }
@@ -166,6 +163,24 @@ public sealed class ReportPeriodFileItem
     public required string OriginalFileName { get; init; }
     public required DateOnly StartDate { get; init; }
     public required DateOnly EndDate { get; init; }
+}
+
+/// <summary>
+/// Analizler sayfasında gösterilen aktif aylık rapor ve genel sonuçları.
+/// </summary>
+public sealed class MonthlyAnalysisItem
+{
+    public required long ImportId { get; init; }
+    public required string OriginalFileName { get; init; }
+    public required DateOnly StartDate { get; init; }
+    public required DateOnly EndDate { get; init; }
+    public decimal? StoreSalesAmount { get; init; }
+    public decimal? CostOfSales { get; init; }
+    public decimal? WasteRate { get; init; }
+    public decimal? WasteQuantity { get; init; }
+    public decimal? WasteAmount { get; init; }
+    public decimal? ProfitRate { get; init; }
+    public decimal? ProfitAmount { get; init; }
 }
 
 /// <summary>
@@ -212,6 +227,7 @@ public sealed class ReportDetailFilter
     public string CategoryText { get; set; } = string.Empty;
     public string ProductText { get; set; } = string.Empty;
     public ReportDetailWasteFilter WasteFilter { get; set; }
+    public ReportDetailComparisonFilter ComparisonFilter { get; set; }
     public decimal? MinimumWasteRate { get; set; }
     public decimal? MaximumWasteRate { get; set; }
     public ReportDetailSort Sort { get; set; }
@@ -222,6 +238,12 @@ public enum ReportDetailWasteFilter
     All,
     Loss,
     NoLoss
+}
+
+public enum ReportDetailComparisonFilter
+{
+    All,
+    WorseThanCumulative
 }
 
 public enum ReportDetailSort
@@ -240,7 +262,6 @@ public sealed class ReportDetailHeader
     public required long Id { get; init; }
     public required long ReportPeriodId { get; init; }
     public required string OriginalFileName { get; init; }
-    public required ReportScope Scope { get; init; }
     public required ReportPeriodType PeriodType { get; init; }
     public required DateOnly StartDate { get; init; }
     public required DateOnly EndDate { get; init; }
@@ -366,20 +387,10 @@ public sealed class ReportNotFoundException : Exception
 }
 
 /// <summary>
-/// Enum ve değerler için kullanıcı arayüzünde gösterilecek Türkçe metin yardımcı metotları.
+/// Teknik enum değerleri için kullanıcı arayüzünde gösterilecek Türkçe metin yardımcı metotları.
 /// </summary>
 public static class ReportDisplayNames
 {
-    /// <summary>
-    /// Rapor kapsamını Türkçe metne çevirir ("Şarküteri", "Kuruyemiş ve Kuru Meyve").
-    /// </summary>
-    public static string Scope(ReportScope scope) => scope switch
-    {
-        ReportScope.Delicatessen => "Şarküteri",
-        ReportScope.NutsAndDriedFruit => "Kuruyemiş ve Kuru Meyve",
-        _ => scope.ToString()
-    };
-
     /// <summary>
     /// Rapor dönem tipini Türkçe metne çevirir ("Aylık kesinleşen", "Kümülatif karşılaştırma").
     /// </summary>

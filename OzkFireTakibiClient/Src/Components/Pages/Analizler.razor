@@ -1,0 +1,195 @@
+@page "/analizler"
+@inherits AuthRequiredComponent
+@implements IAsyncDisposable
+@using System.Globalization
+@using System.Security.Claims
+@inject ReportImportService ReportImportService
+
+<PageTitle>Analizler</PageTitle>
+
+<div class="container">
+    <div class="level mb-5">
+        <div class="level-left">
+            <div>
+                <h1 class="title is-3 mb-2">Analizler</h1>
+                <p class="subtitle is-6 has-text-grey">
+                    Aktif aylık raporların genel fire ve kârlılık sonuçlarını inceleyin.
+                </p>
+            </div>
+        </div>
+        <div class="level-right">
+            <button class="button is-light"
+                    type="button"
+                    disabled="@isLoading"
+                    @onclick="LoadAsync">
+                <span class="icon"><i class="fas fa-rotate"></i></span>
+                <span>Yenile</span>
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="notification is-danger is-light" role="alert">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-circle-exclamation"></i></span>
+                <span>@errorMessage</span>
+            </span>
+        </div>
+    }
+
+    @if (isLoading && analyses.Count == 0)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (analyses.Count == 0)
+    {
+        <section class="box has-text-centered has-text-grey py-6">
+            <span class="icon is-large"><i class="fas fa-chart-line fa-2x"></i></span>
+            <p class="mt-2">İncelenebilecek aktif aylık rapor bulunmuyor.</p>
+        </section>
+    }
+    else
+    {
+        @foreach (var monthGroup in MonthGroups)
+        {
+            <section class="mb-6" aria-labelledby="@MonthHeadingId(monthGroup.Key)">
+                <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+                    <h2 id="@MonthHeadingId(monthGroup.Key)" class="title is-4 mb-0 is-capitalized">
+                        @FormatMonth(monthGroup.Key)
+                    </h2>
+                    <span class="tag is-light">@monthGroup.Count() rapor</span>
+                </div>
+
+                <div class="analysis-list">
+                    @foreach (var item in monthGroup)
+                    {
+                        <NavLink class="analysis-link" href="@($"raporlar/{item.ImportId}")">
+                            <article class="box analysis-card">
+                                <div class="level mb-4">
+                                    <div class="level-left report-heading">
+                                        <div>
+                                            <h3 class="title is-5 mb-2 report-file-name">@item.OriginalFileName</h3>
+                                            <p class="is-size-7 has-text-grey">
+                                                @item.StartDate.ToString("dd.MM.yyyy") – @item.EndDate.ToString("dd.MM.yyyy")
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="level-right">
+                                        <span class="icon-text has-text-primary has-text-weight-semibold">
+                                            <span>Detayı aç</span>
+                                            <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="columns is-mobile is-multiline metric-grid">
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Satış tutarı</p>
+                                        <p class="metric-value">@FormatNumber(item.StoreSalesAmount)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Satış maliyeti</p>
+                                        <p class="metric-value">@FormatNumber(item.CostOfSales)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Fire oranı</p>
+                                        <p class="metric-value has-text-danger">@FormatRate(item.WasteRate)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Fire tutarı</p>
+                                        <p class="metric-value has-text-danger">@FormatNumber(item.WasteAmount)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Fire miktarı</p>
+                                        <p class="metric-value">@FormatNumber(item.WasteQuantity)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Kâr oranı</p>
+                                        <p class="metric-value">@FormatRate(item.ProfitRate)</p>
+                                    </div>
+                                    <div class="column is-half-mobile is-one-quarter-desktop">
+                                        <p class="heading">Kâr tutarı</p>
+                                        <p class="metric-value">@FormatNumber(item.ProfitAmount)</p>
+                                    </div>
+                                </div>
+                            </article>
+                        </NavLink>
+                    }
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private IReadOnlyList<MonthlyAnalysisItem> analyses = [];
+    private string? errorMessage;
+    private bool isLoading;
+
+    private IEnumerable<IGrouping<DateOnly, MonthlyAnalysisItem>> MonthGroups => analyses
+        .GroupBy(item => new DateOnly(item.EndDate.Year, item.EndDate.Month, 1))
+        .OrderByDescending(group => group.Key);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+
+        if (currentUser.Identity?.IsAuthenticated == true)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (isLoading || currentUser.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            analyses = await ReportImportService.GetMonthlyAnalysesAsync(
+                currentUser,
+                cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (Exception)
+        {
+            errorMessage = "Analizler yüklenirken beklenmeyen bir hata oluştu.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string FormatMonth(DateOnly month) =>
+        month.ToDateTime(TimeOnly.MinValue).ToString("MMMM yyyy", TurkishCulture);
+
+    private static string MonthHeadingId(DateOnly month) => $"month-{month:yyyy-MM}";
+    private static string FormatNumber(decimal? value) => value?.ToString("N2", TurkishCulture) ?? "–";
+    private static string FormatRate(decimal? value) => value is null ? "–" : $"% {value.Value.ToString("N2", TurkishCulture)}";
+
+    public ValueTask DisposeAsync()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+}

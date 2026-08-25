@@ -25,7 +25,7 @@ public sealed class ExcuseListItem
     public required string Title { get; init; }
     public required ExcuseSource Source { get; init; }
     public required ReportRowType TargetRowType { get; init; }
-    public required ReportScope Scope { get; init; }
+    public required string ReportName { get; init; }
     public required DateOnly PeriodEndDate { get; init; }
     public required int StoreNumber { get; init; }
     public required string StoreName { get; init; }
@@ -46,7 +46,7 @@ public sealed class ExcuseDetailResult
     public required string Title { get; init; }
     public required ExcuseSource Source { get; init; }
     public required ReportRowType TargetRowType { get; init; }
-    public required ReportScope Scope { get; init; }
+    public required string ReportName { get; init; }
     public required DateOnly StartDate { get; init; }
     public required DateOnly EndDate { get; init; }
     public required int StoreNumber { get; init; }

@@ -1,15 +1,16 @@
 namespace OzkFireTakibiClient.Src.Data.Entities;
 
 /// <summary>
-/// Belirli bir ürün grubu (Scope) ve dönem sonu tarihine (EndDate) ait rapor dönemini temsil eder.
+/// Aynı kategori kümesi ve dönem sonu tarihine ait rapor dönemini temsil eder.
 /// Aylık kesinleşen ve kümülatif karşılaştırma raporları bu dönem altında gruplanır.
 /// </summary>
 public class ReportPeriodEntity : BaseEntity<long>
 {
     /// <summary>
-    /// Raporun ürün kapsamı (Şarküteri veya Kuruyemiş/Kuru Meyve)
+    /// Excel'deki sıralanmış kategori kodlarından üretilen teknik eşleştirme imzası.
+    /// Kullanıcı arayüzünde gösterilmez.
     /// </summary>
-    public ReportScope Scope { get; set; }
+    public string CategorySignature { get; set; } = default!;
 
     /// <summary>
     /// Rapor döneminin bitiş tarihi
@@ -21,4 +22,3 @@ public class ReportPeriodEntity : BaseEntity<long>
     /// </summary>
     public ICollection<ReportImportEntity> Imports { get; set; } = new List<ReportImportEntity>();
 }
-

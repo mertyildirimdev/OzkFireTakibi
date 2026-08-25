@@ -1,0 +1,40 @@
+.analysis-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.analysis-link {
+    color: inherit;
+    display: block;
+}
+
+.analysis-link:hover {
+    color: inherit;
+}
+
+.analysis-card {
+    border: 1px solid transparent;
+    height: 100%;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.analysis-link:hover .analysis-card,
+.analysis-link:focus-visible .analysis-card {
+    border-color: var(--bulma-primary, #00d1b2);
+    box-shadow: 0 0.75rem 1.5rem rgb(10 10 10 / 8%);
+    transform: translateY(-2px);
+}
+
+.report-heading {
+    min-width: 0;
+}
+
+.report-file-name {
+    overflow-wrap: anywhere;
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.25;
+}

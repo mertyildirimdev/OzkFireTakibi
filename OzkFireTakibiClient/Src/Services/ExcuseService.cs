@@ -74,7 +74,7 @@ public sealed class ExcuseService(
                 request.Title,
                 request.Source,
                 TargetRowType = request.ReportRow.RowType,
-                request.ReportRow.ReportImport.Scope,
+                ReportName = request.ReportRow.ReportImport.OriginalFileName,
                 PeriodEndDate = request.ReportRow.ReportImport.EndDate,
                 StoreNumber = request.ReportRow.StoreNumber!.Value,
                 StoreName = request.ReportRow.StoreName!,
@@ -111,14 +111,12 @@ public sealed class ExcuseService(
             Title = item.Title,
             Source = item.Source,
             TargetRowType = item.TargetRowType,
-            Scope = item.Scope,
+            ReportName = item.ReportName,
             PeriodEndDate = item.PeriodEndDate,
             StoreNumber = item.StoreNumber,
             StoreName = item.StoreName ?? item.StoreNumber.ToString(),
             TargetCode = item.TargetCode,
-            TargetName = item.TargetRowType == ReportRowType.StoreSummary
-                ? ReportDisplayNames.Scope(item.Scope)
-                : item.TargetName,
+            TargetName = item.TargetName,
             BenchmarkRate = item.BenchmarkRate,
             StoreRate = item.StoreRate,
             ThresholdRate = item.ThresholdRate,
@@ -228,15 +226,15 @@ public sealed class ExcuseService(
             Title = request.Title,
             Source = request.Source,
             TargetRowType = targetRow.RowType,
-            Scope = reportImport.Scope,
+            ReportName = reportImport.OriginalFileName,
             StartDate = reportImport.StartDate,
             EndDate = reportImport.EndDate,
             StoreNumber = targetRow.StoreNumber!.Value,
             StoreName = targetRow.StoreName ?? targetRow.StoreNumber.Value.ToString(),
             TargetCode = targetRow.RowType == ReportRowType.StoreCategory ? targetRow.CategoryCode : targetRow.StockCode,
-            TargetName = targetRow.RowType == ReportRowType.StoreSummary
-                ? ReportDisplayNames.Scope(reportImport.Scope)
-                : targetRow.RowType == ReportRowType.StoreCategory ? targetRow.CategoryName : targetRow.StockName,
+            TargetName = targetRow.RowType == ReportRowType.StoreCategory
+                ? targetRow.CategoryName
+                : targetRow.RowType == ReportRowType.StoreProduct ? targetRow.StockName : null,
             RequestNote = request.RequestNote,
             RequestedBy = request.RequestedByUser is null
                 ? null

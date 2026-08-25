@@ -1,23 +1,253 @@
-@*
-    Ana Sayfa / Başlangıç Paneli (Anasayfa.razor)
-    Giriş yapan kullanıcıyı karşılar, rol bilgisini ve temel sistem durumunu görüntüler.
-*@
-
 @page "/"
-@inherits OzkFireTakibiClient.Src.Components.Controls.AuthRequiredComponent
+@inherits AuthRequiredComponent
 
-<PageTitle>Anasayfa</PageTitle>
+<PageTitle>Anasayfa | ÖZK Fire Takibi</PageTitle>
 
-<div class="container">
-    <div class="box p-5 mb-5">
-        <h1 class="title is-3 mb-2">Hoş Geldiniz, @UserName</h1>
-        <p class="subtitle is-6 has-text-grey mb-4">
-            Kullanıcı Rolü: <span class="tag is-primary is-light is-rounded">@UserRole</span>
-        </p>
-        <div class="notification is-info is-light">
-            <i class="fas fa-circle-info mr-2"></i>
-            ÖZK Fire Takibi uygulamasına başarıyla giriş yaptınız.
+<div class="home-page">
+    <section class="home-hero" aria-labelledby="welcome-title">
+        <div class="hero-decoration hero-decoration-one" aria-hidden="true"></div>
+        <div class="hero-decoration hero-decoration-two" aria-hidden="true"></div>
+
+        <div class="hero-content">
+            <div class="eyebrow">
+                <span class="eyebrow-mark" aria-hidden="true"></span>
+                Operasyon merkezi
+            </div>
+
+            <h1 id="welcome-title">@Greeting, <span>@DisplayName</span></h1>
+            <p class="hero-description">@RoleDescription</p>
+
+            <div class="identity-row" aria-label="Kullanıcı bilgileri">
+                <span class="identity-chip identity-role">
+                    <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                    @RoleDisplayName
+                </span>
+                @if (HasStoreAssignment)
+                {
+                    <span class="identity-chip">
+                        <i class="fas fa-store" aria-hidden="true"></i>
+                        @StoreDisplayName
+                    </span>
+                }
+            </div>
+
+            <div class="hero-actions">
+                <NavLink class="button primary-action" href="/analizler">
+                    <span>Analizleri görüntüle</span>
+                    <span class="icon" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                </NavLink>
+                <NavLink class="button secondary-action" href="/mazeretler">
+                    <span class="icon" aria-hidden="true"><i class="fas fa-clipboard-check"></i></span>
+                    <span>Mazeretleri takip et</span>
+                </NavLink>
+            </div>
         </div>
+
+        <div class="hero-summary" aria-label="Sistem özeti">
+            <div class="summary-icon" aria-hidden="true">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <p class="summary-label">Tek merkezde takip</p>
+            <p class="summary-value">Fire, kârlılık ve mazeret süreçleri</p>
+            <div class="summary-divider"></div>
+            <p class="summary-note">
+                Aylık ve kümülatif verileri karşılaştırın, mağaza aksiyonlarını aynı akıştan yönetin.
+            </p>
+        </div>
+    </section>
+
+    <section class="home-section" aria-labelledby="quick-actions-title">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Hızlı erişim</p>
+                <h2 id="quick-actions-title">Bugün nereden başlayacaksınız?</h2>
+            </div>
+            <p>Rolünüze açık işlemler burada listelenir.</p>
+        </div>
+
+        <div class="action-grid">
+            <NavLink class="action-card" href="/analizler">
+                <span class="action-icon action-icon-coral" aria-hidden="true">
+                    <i class="fas fa-chart-column"></i>
+                </span>
+                <span class="action-content">
+                    <strong>Analizler</strong>
+                    <small>Aylık fire ve kârlılık sonuçlarını inceleyin.</small>
+                </span>
+                <span class="action-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+            </NavLink>
+
+            <NavLink class="action-card" href="/mazeretler">
+                <span class="action-icon action-icon-blue" aria-hidden="true">
+                    <i class="fas fa-comments"></i>
+                </span>
+                <span class="action-content">
+                    <strong>Mazeret takibi</strong>
+                    <small>@ExcuseActionDescription</small>
+                </span>
+                <span class="action-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+            </NavLink>
+
+            <AuthorizeView Policy="@ReportPolicies.CanImportReports">
+                <Authorized>
+                    <NavLink class="action-card" href="/raporlar">
+                        <span class="action-icon action-icon-green" aria-hidden="true">
+                            <i class="fas fa-file-arrow-up"></i>
+                        </span>
+                        <span class="action-content">
+                            <strong>Rapor paketi yükle</strong>
+                            <small>Aylık ve kümülatif Excel dosyalarını birlikte aktarın.</small>
+                        </span>
+                        <span class="action-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                    </NavLink>
+                </Authorized>
+            </AuthorizeView>
+
+            <AuthorizeView Policy="@ReportPolicies.CanManageExcuseStores">
+                <Authorized>
+                    <NavLink class="action-card" href="/mazeretler/magazalar">
+                        <span class="action-icon action-icon-amber" aria-hidden="true">
+                            <i class="fas fa-store"></i>
+                        </span>
+                        <span class="action-content">
+                            <strong>Mağaza kapsamı</strong>
+                            <small>Mazeret sürecine dahil mağazaları yönetin.</small>
+                        </span>
+                        <span class="action-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                    </NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </section>
+
+    <div class="insight-grid">
+        <section class="profile-card" aria-labelledby="permission-title">
+            <div class="card-heading">
+                <span class="card-heading-icon" aria-hidden="true"><i class="fas fa-user-lock"></i></span>
+                <div>
+                    <p class="section-kicker">Yetki profiliniz</p>
+                    <h2 id="permission-title">@RoleDisplayName erişimi</h2>
+                </div>
+            </div>
+
+            <ul class="permission-list">
+                @foreach (var permission in RolePermissions)
+                {
+                    <li>
+                        <span aria-hidden="true"><i class="fas fa-check"></i></span>
+                        @permission
+                    </li>
+                }
+            </ul>
+        </section>
+
+        <section class="process-card" aria-labelledby="process-title">
+            <div class="process-heading">
+                <div>
+                    <p class="section-kicker">Çalışma akışı</p>
+                    <h2 id="process-title">Veriden aksiyona, üç adımda</h2>
+                </div>
+                <span class="live-badge"><span aria-hidden="true"></span>Sistem hazır</span>
+            </div>
+
+            <ol class="process-list">
+                <li>
+                    <span class="process-number">01</span>
+                    <div><strong>Analizi açın</strong><small>İlgili ayın Excel raporunu seçin.</small></div>
+                </li>
+                <li>
+                    <span class="process-number">02</span>
+                    <div><strong>Fire detayını inceleyin</strong><small>Mağaza ve alt kategori kırılımlarını karşılaştırın.</small></div>
+                </li>
+                <li>
+                    <span class="process-number">03</span>
+                    <div><strong>Aksiyonu tamamlayın</strong><small>Mazeret talebini takip edin ve süreci sonuçlandırın.</small></div>
+                </li>
+            </ol>
+        </section>
     </div>
 </div>
+
+@code {
+    private string DisplayName => string.IsNullOrWhiteSpace(UserName) ? "Hoş geldiniz" : UserName!;
+
+    private string Greeting => DateTime.Now.Hour switch
+    {
+        < 12 => "Günaydın",
+        < 18 => "İyi günler",
+        _ => "İyi akşamlar"
+    };
+
+    private string NormalizedRole => CurrentUser?.Role?.Trim().ToLowerInvariant() ?? string.Empty;
+
+    private string RoleDisplayName => NormalizedRole switch
+    {
+        "admin" => "Yönetici",
+        "moderator" => "Moderatör",
+        "observer" => "Gözlemci",
+        "user" => "Mağaza kullanıcısı",
+        _ => "Kullanıcı"
+    };
+
+    private string RoleDescription => NormalizedRole switch
+    {
+        "admin" => "Tüm fire ve kârlılık operasyonunu izleyin; rapor, mazeret ve mağaza kapsamını tek noktadan yönetin.",
+        "moderator" => "Rapor paketlerini yönetin, fire analizlerini inceleyin ve mazeret değerlendirme sürecini ilerletin.",
+        "observer" => "Fire ve kârlılık eğilimlerini takip edin, ihtiyaç duyulan detaylar için mazeret sürecini başlatın.",
+        "user" => "Mağazanıza ait fire sonuçlarını ve bekleyen mazeret taleplerini güvenli şekilde takip edin.",
+        _ => "Fire, kârlılık ve mazeret süreçlerini yetkileriniz kapsamında tek noktadan takip edin."
+    };
+
+    private string ExcuseActionDescription => NormalizedRole == "user"
+        ? "Mağazanıza iletilen talepleri görüntüleyin ve yanıtlayın."
+        : "Açık talepleri ve değerlendirme durumlarını takip edin.";
+
+    private bool HasStoreAssignment =>
+        !string.IsNullOrWhiteSpace(CurrentUser?.StoreName) || CurrentUser?.StoreNumber is not null;
+
+    private string StoreDisplayName
+    {
+        get
+        {
+            var storeName = CurrentUser?.StoreName?.Trim();
+            var storeNumber = CurrentUser?.StoreNumber;
+
+            if (!string.IsNullOrWhiteSpace(storeName) && storeNumber is not null)
+            {
+                return $"{storeName} · Depo {storeNumber}";
+            }
+
+            return !string.IsNullOrWhiteSpace(storeName) ? storeName : $"Depo {storeNumber}";
+        }
+    }
+
+    private IReadOnlyList<string> RolePermissions => NormalizedRole switch
+    {
+        "admin" =>
+        [
+            "Rapor paketlerini yükleyebilir ve geçmiş kayıtları silebilirsiniz.",
+            "Mazeret taleplerini inceleyip değerlendirebilirsiniz.",
+            "Mazeret mağaza kapsamını yönetebilirsiniz."
+        ],
+        "moderator" =>
+        [
+            "Rapor paketlerini yükleyebilir ve analizleri görüntüleyebilirsiniz.",
+            "Mazeret taleplerini inceleyip değerlendirebilirsiniz.",
+            "Detay satırları için mazeret talebi oluşturabilirsiniz."
+        ],
+        "observer" =>
+        [
+            "Rapor ve karşılaştırma analizlerini görüntüleyebilirsiniz.",
+            "Mazeret süreçlerinin güncel durumunu takip edebilirsiniz.",
+            "Detay satırları için mazeret talebi oluşturabilirsiniz."
+        ],
+        "user" =>
+        [
+            "Yetkili olduğunuz mağazanın raporlarını görüntüleyebilirsiniz.",
+            "Mağazanıza iletilen mazeret taleplerini takip edebilirsiniz.",
+            "Bekleyen talepleri yanıtlayarak süreci ilerletebilirsiniz."
+        ],
+        _ => ["Rapor ve mazeret süreçlerine tanımlı yetkileriniz kapsamında erişebilirsiniz."]
+    };
+}
 

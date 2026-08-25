@@ -101,7 +101,7 @@ public sealed class ExcuseAutomationService(IOptions<ExcuseOptions> options)
             {
                 ReportRowId = row.Id,
                 Source = ExcuseSource.Automatic,
-                Title = $"{ReportDisplayNames.Scope(monthlyImport.Scope)} — {row.StoreName ?? storeNumber.ToString()}",
+                Title = row.StoreName ?? storeNumber.ToString(),
                 ThresholdRate = thresholdRate,
                 Status = ExcuseStatus.Open,
                 CreatedAt = now,
