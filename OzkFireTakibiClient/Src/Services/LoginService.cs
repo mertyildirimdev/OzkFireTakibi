@@ -1,25 +1,22 @@
 namespace OzkFireTakibiClient.Src.Services;
 
-using OzkFireTakibiClient.Src.Data;
 using OzkFireTakibiClient.Src.Data.Entities;
+using OzkFireTakibiClient.Src.Authorization;
 
 /// <summary>
 /// Kullanıcı oturum açma, oturum kapatma ve oturum durumu sorgulama işlemlerini yöneten servis.
 /// </summary>
-public class LoginService(AppDbContext dbContext, UserService userService, CustomStateProvider customStateProvider) : BaseService(dbContext)
+public class LoginService(UserService userService, CustomStateProvider customStateProvider)
 {
-    private readonly UserService _userService = userService;
-    private readonly CustomStateProvider _customStateProvider = customStateProvider;
-
     /// <summary>
     /// Geçerli oturum açmış kullanıcı varlığı
     /// </summary>
-    public UserEntity? CurrentUser => _customStateProvider.CurrentUser;
+    public UserEntity? CurrentUser => customStateProvider.CurrentUser;
 
     /// <summary>
     /// Kullanıcının oturum açmış olup olmadığını belirtir
     /// </summary>
-    public bool IsAuthenticated => _customStateProvider.CurrentUser != null;
+    public bool IsAuthenticated => customStateProvider.CurrentUser != null;
 
     /// <summary>
     /// E-posta ve şifre ile kullanıcı girişi yapar ve oturum durumunu günceller.
@@ -30,10 +27,10 @@ public class LoginService(AppDbContext dbContext, UserService userService, Custo
     /// <returns>Giriş başarılı ise true, aksi halde false</returns>
     public async Task<bool> LoginAsync(string email, string password, bool rememberMe = false)
     {
-        var user = await _userService.LoginAsync(email, password);
+        var user = await userService.LoginAsync(email, password);
         if (user != null)
         {
-            await _customStateProvider.MarkUserAsAuthenticatedAsync(user, rememberMe);
+            await customStateProvider.MarkUserAsAuthenticatedAsync(user, rememberMe);
             return true;
         }
 
@@ -45,7 +42,7 @@ public class LoginService(AppDbContext dbContext, UserService userService, Custo
     /// </summary>
     public async Task LogoutAsync()
     {
-        await _customStateProvider.MarkUserAsLoggedOutAsync();
+        await customStateProvider.MarkUserAsLoggedOutAsync();
     }
 
     /// <summary>

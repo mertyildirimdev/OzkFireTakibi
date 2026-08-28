@@ -32,7 +32,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Temel iş mantığı ve yardımcı servisleri (BaseService türevleri, parser, import servisi vb.) DI konteynerine kaydet
+// Temel iş mantığı ve yardımcı servisleri (parser, import servisi vb.) DI konteynerine kaydet
 builder.Services.AddBaseServices();
 
 // Veri koruma (Data Protection) yapılandırması
@@ -83,6 +83,8 @@ builder.Services.AddScoped(sp => (CustomStateProvider)sp.GetRequiredService<Auth
 
 
 var app = builder.Build();
+
+await DbSeeder.SeedAsync(app.Services);
 
 // --- HTTP İstek Ardışık Düzeni (Middleware Pipeline) Yapılandırması ---
 

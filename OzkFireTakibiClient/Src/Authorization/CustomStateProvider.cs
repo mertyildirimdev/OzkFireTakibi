@@ -1,4 +1,4 @@
-namespace OzkFireTakibiClient.Src;
+namespace OzkFireTakibiClient.Src.Authorization;
 
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;

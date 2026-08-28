@@ -503,7 +503,7 @@
         }
         catch (Exception exception)
         {
-            errorMessage = GetUserMessage(exception);
+            errorMessage = OzkFireTakibiClient.Src.Components.Controls.ErrorMessageHelper.GetReportErrorMessage(exception);
             DeleteTemporaryFile(periodType);
         }
         finally
@@ -561,7 +561,7 @@
         }
         catch (Exception exception)
         {
-            errorMessage = GetUserMessage(exception);
+            errorMessage = OzkFireTakibiClient.Src.Components.Controls.ErrorMessageHelper.GetReportErrorMessage(exception);
         }
         finally
         {
@@ -592,7 +592,7 @@
         }
         catch (Exception exception)
         {
-            errorMessage = GetUserMessage(exception);
+            errorMessage = OzkFireTakibiClient.Src.Components.Controls.ErrorMessageHelper.GetReportErrorMessage(exception);
         }
         finally
         {
@@ -653,7 +653,7 @@
         }
         catch (Exception exception)
         {
-            errorMessage = GetUserMessage(exception);
+            errorMessage = OzkFireTakibiClient.Src.Components.Controls.ErrorMessageHelper.GetReportErrorMessage(exception);
         }
         finally
         {
@@ -706,15 +706,6 @@
 
     private void ClearError() => errorMessage = null;
     private void ClearSuccess() => successMessage = null;
-
-    private static string GetUserMessage(Exception exception) => exception switch
-    {
-        ReportImportValidationException => exception.Message,
-        ReportNotFoundException => exception.Message,
-        UnauthorizedAccessException => exception.Message,
-        IOException => "Dosya okunurken bir hata oluştu. Dosyayı kapatıp yeniden deneyin.",
-        _ => "Rapor işlenirken beklenmeyen bir hata oluştu."
-    };
 
     public ValueTask DisposeAsync()
     {

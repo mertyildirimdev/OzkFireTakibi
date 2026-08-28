@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using OzkFireTakibiClient.Src.Data.Entities;
+using OzkFireTakibiClient.Src.Authorization;
 
 namespace OzkFireTakibiClient.Src.Components.Controls;
 

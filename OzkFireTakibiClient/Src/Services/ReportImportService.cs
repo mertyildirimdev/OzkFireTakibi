@@ -108,7 +108,7 @@ public sealed class ReportImportService(
         CancellationToken cancellationToken = default)
     {
         await EnsureCanImportAsync(user);
-        var uploadedByUserId = GetUserId(user);
+        var uploadedByUserId = user.GetUserId();
         var (monthlyReport, cumulativeReport) = await ParsePairAsync(
             monthlyFilePath,
             monthlyOriginalFileName,
@@ -264,7 +264,7 @@ public sealed class ReportImportService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated();
 
         pageSize = Math.Clamp(pageSize, 10, 100);
         pageNumber = Math.Max(1, pageNumber);
@@ -432,7 +432,7 @@ public sealed class ReportImportService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated();
 
         pageSize = Math.Clamp(pageSize, 10, 100);
         pageNumber = Math.Max(1, pageNumber);
@@ -898,14 +898,6 @@ public sealed class ReportImportService(
         return normalized.Length <= maximumLength ? normalized : normalized[..maximumLength];
     }
 
-    private static void EnsureAuthenticated(ClaimsPrincipal user)
-    {
-        if (user.Identity?.IsAuthenticated != true)
-        {
-            throw new UnauthorizedAccessException("Rapor detaylarını görüntülemek için oturum açılmalıdır.");
-        }
-    }
-
     private void ValidateFile(string filePath)
     {
         var fileInfo = new FileInfo(filePath);
@@ -926,17 +918,6 @@ public sealed class ReportImportService(
         }
     }
 
-    private static int GetUserId(ClaimsPrincipal user)
-    {
-        var userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdValue, out var userId))
-        {
-            throw new UnauthorizedAccessException("Oturumdaki kullanıcı kimliği çözümlenemedi.");
-        }
-
-        return userId;
-    }
-
     private static string NormalizeFileName(string originalFileName)
     {
         var fileName = Path.GetFileName(originalFileName).Trim();
@@ -954,6 +935,7 @@ public sealed class ReportImportService(
         string cumulativeFilePath,
         string cumulativeOriginalFileName,
         CancellationToken cancellationToken)
+
     {
         ValidateFile(monthlyFilePath);
         ValidateFile(cumulativeFilePath);

@@ -32,7 +32,7 @@ public sealed class ExcuseService(
         int pageNumber,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         pageNumber = Math.Max(1, pageNumber);
         var pageSize = Math.Clamp(_options.PageSize, 10, 100);
         var normalizedSearch = searchText?.Trim();
@@ -156,7 +156,7 @@ public sealed class ExcuseService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         var access = GetAccess(user);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -292,7 +292,7 @@ public sealed class ExcuseService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanRequestExcuses);
         if (!authorization.Succeeded)
         {
@@ -337,7 +337,7 @@ public sealed class ExcuseService(
             Source = ExcuseSource.Manual,
             Title = $"{targetName} — {row.StoreName ?? row.StoreNumber.Value.ToString()}",
             RequestNote = normalizedNote,
-            RequestedByUserId = GetUserId(user),
+            RequestedByUserId = user.GetUserId(),
             Status = ExcuseStatus.Open,
             CreatedAt = now,
             UpdatedAt = now
@@ -357,7 +357,7 @@ public sealed class ExcuseService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         var access = GetAccess(user);
         var normalizedMessage = ValidateMessage(message, 10);
         if (!access.IsStoreUser || (access.StoreNumber is null && string.IsNullOrWhiteSpace(access.StoreName)))
@@ -385,7 +385,7 @@ public sealed class ExcuseService(
         dbContext.ExcuseEntries.Add(new ExcuseEntryEntity
         {
             ExcuseRequestId = request.Id,
-            CreatedByUserId = GetUserId(user),
+            CreatedByUserId = user.GetUserId(),
             EntryType = ExcuseEntryType.StoreResponse,
             ReasonType = reasonType,
             Message = normalizedMessage,
@@ -408,7 +408,7 @@ public sealed class ExcuseService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanReviewExcuses);
         if (!authorization.Succeeded)
         {
@@ -431,7 +431,7 @@ public sealed class ExcuseService(
         dbContext.ExcuseEntries.Add(new ExcuseEntryEntity
         {
             ExcuseRequestId = request.Id,
-            CreatedByUserId = GetUserId(user),
+            CreatedByUserId = user.GetUserId(),
             EntryType = approve ? ExcuseEntryType.Approval : ExcuseEntryType.RevisionRequest,
             Message = normalizedMessage,
             CreatedAt = now,
@@ -566,7 +566,7 @@ public sealed class ExcuseService(
 
     private async Task EnsureStoreManagementAsync(ClaimsPrincipal user)
     {
-        EnsureAuthenticated(user);
+        user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         var authorization = await authorizationService.AuthorizeAsync(user, ReportPolicies.CanManageExcuseStores);
         if (!authorization.Succeeded)
         {
@@ -657,21 +657,7 @@ public sealed class ExcuseService(
         return normalized;
     }
 
-    private static void EnsureAuthenticated(ClaimsPrincipal user)
-    {
-        if (user.Identity?.IsAuthenticated != true)
-        {
-            throw new UnauthorizedAccessException("Mazeretleri görüntülemek için oturum açılmalıdır.");
-        }
-    }
 
-    private static int GetUserId(ClaimsPrincipal user)
-    {
-        var value = user.FindFirstValue(ClaimTypes.NameIdentifier);
-        return int.TryParse(value, out var userId)
-            ? userId
-            : throw new UnauthorizedAccessException("Kullanıcı kimliği doğrulanamadı.");
-    }
 
     private sealed record ExcuseAccess(bool IsStoreUser, int? StoreNumber, string? StoreName);
 }

@@ -7,14 +7,15 @@ namespace OzkFireTakibiClient.Src.Services;
 /// <summary>
 /// Kullanıcı yönetimi, kimlik doğrulama kontrolleri ve CRUD işlemlerini yürüten servis.
 /// </summary>
-public class UserService(AppDbContext dbContext) : BaseService(dbContext)
+public class UserService(IDbContextFactory<AppDbContext> dbContextFactory)
 {
     /// <summary>
     /// Verilen kullanıcı kimliğine (ID) ait rol adını döndürür.
     /// </summary>
     public virtual async Task<string> GetUserRoleAsync(int userId)
     {
-        var user = await _dbContext.Users
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var user = await dbContext.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
 
@@ -24,9 +25,10 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
     /// <summary>
     /// Kimlik (ID) ile silinmemiş kullanıcı kaydını getirir.
     /// </summary>
-    public virtual Task<UserEntity?> GetUserByIdAsync(int id)
+    public virtual async Task<UserEntity?> GetUserByIdAsync(int id)
     {
-        return _dbContext.Users
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        return await dbContext.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
     }
@@ -34,10 +36,11 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
     /// <summary>
     /// E-posta adresi ile silinmemiş kullanıcı kaydını getirir.
     /// </summary>
-    public virtual Task<UserEntity?> GetUserByEmailAsync(string email)
+    public virtual async Task<UserEntity?> GetUserByEmailAsync(string email)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var normalizedEmail = email.Trim();
-        return _dbContext.Users
+        return await dbContext.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email == normalizedEmail && !u.IsDeleted);
     }
@@ -45,23 +48,31 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
     /// <summary>
     /// E-posta ve şifre eşleşmesini kontrol ederek kullanıcı doğrulaması yapar.
     /// </summary>
-    public virtual Task<UserEntity?> LoginAsync(string email, string password)
+    public virtual async Task<UserEntity?> LoginAsync(string email, string password)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var normalizedEmail = email.Trim();
-        return _dbContext.Users
+        var user = await dbContext.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u =>
                 u.Email == normalizedEmail &&
-                u.Password == password &&
                 !u.IsDeleted);
+
+        if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
+        {
+            return null;
+        }
+
+        return user;
     }
 
     /// <summary>
     /// Sistemdeki tüm aktif (silinmemiş) kullanıcıları listeler.
     /// </summary>
-    public virtual Task<List<UserEntity>> GetAllUsersAsync()
+    public virtual async Task<List<UserEntity>> GetAllUsersAsync()
     {
-        return _dbContext.Users
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        return await dbContext.Users
             .AsNoTracking()
             .Where(u => !u.IsDeleted)
             .ToListAsync();
@@ -72,13 +83,15 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
     /// </summary>
     public virtual async Task<bool> CreateUserAsync(UserEntity user)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
+        user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
         user.CreatedAt = now;
         user.UpdatedAt = now;
         user.IsDeleted = false;
 
-        await _dbContext.Users.AddAsync(user);
-        return await _dbContext.SaveChangesAsync() > 0;
+        await dbContext.Users.AddAsync(user);
+        return await dbContext.SaveChangesAsync() > 0;
     }
 
     /// <summary>
@@ -86,7 +99,8 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
     /// </summary>
     public virtual async Task<bool> DeleteUserAsync(int id)
     {
-        var user = await _dbContext.Users
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
 
         if (user is null)
@@ -96,7 +110,7 @@ public class UserService(AppDbContext dbContext) : BaseService(dbContext)
 
         user.IsDeleted = true;
         user.UpdatedAt = DateTime.UtcNow;
-        return await _dbContext.SaveChangesAsync() > 0;
+        return await dbContext.SaveChangesAsync() > 0;
     }
 }
 

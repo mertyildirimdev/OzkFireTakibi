@@ -707,7 +707,7 @@
         }
         catch (Exception exception)
         {
-            errorMessage = GetUserMessage(exception);
+            errorMessage = OzkFireTakibiClient.Src.Components.Controls.ErrorMessageHelper.GetDetailErrorMessage(exception);
         }
         finally
         {
@@ -941,13 +941,6 @@
     private static bool IsStockField(string fieldKey) => fieldKey is "stockCode" or "stockName";
     private static bool IsAlternativeNameField(string fieldKey) => fieldKey == "alternativeName";
     private static bool IsCostGroupField(string fieldKey) => fieldKey is "costGroupType" or "costGroupCode";
-
-    private static string GetUserMessage(Exception exception) => exception switch
-    {
-        ReportNotFoundException => exception.Message,
-        UnauthorizedAccessException => exception.Message,
-        _ => "Rapor detayları yüklenirken beklenmeyen bir hata oluştu."
-    };
 
     public ValueTask DisposeAsync()
     {
