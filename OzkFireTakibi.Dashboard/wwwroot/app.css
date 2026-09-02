@@ -1,0 +1,31 @@
+html,
+body {
+    min-height: 100%;
+}
+
+html {
+    color-scheme: light;
+}
+
+body {
+    background-color: var(--bulma-scheme-main-bis);
+}
+
+:root {
+    --bulma-family-primary: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    --bulma-family-secondary: var(--bulma-family-primary);
+}
+
+h1:focus,
+h2:focus,
+h3:focus {
+    outline: none;
+}
+
+#blazor-error-ui {
+    display: none;
+}
+
+.blazor-error-boundary::after {
+    content: "Bir hata oluştu.";
+}

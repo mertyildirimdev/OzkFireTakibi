@@ -1,0 +1,111 @@
+<div class="dropdown is-right @(IsOpen ? "is-active" : null)">
+    <div class="dropdown-trigger">
+        <button class="button is-small @(IsFiltered ? "is-primary is-light" : "is-white")" type="button"
+                aria-haspopup="true" aria-expanded="@IsOpen" title="@Column.Label filtresi" @onclick="ToggleMenu">
+            <span>@Column.Label</span>
+            @if (IsFiltered)
+            {
+                <span class="icon is-small"><i class="fas fa-filter"></i></span>
+            }
+            else
+            {
+                <span class="icon is-small"><i class="fas fa-chevron-down"></i></span>
+            }
+        </button>
+    </div>
+    @if (IsOpen)
+    {
+        <div class="dropdown-menu" role="menu">
+            <div class="dropdown-content p-3">
+                <div class="buttons are-small mb-3">
+                    <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Ascending)">
+                        <span class="icon"><i class="fas fa-arrow-up-a-z"></i></span><span>Artan</span>
+                    </button>
+                    <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Descending)">
+                        <span class="icon"><i class="fas fa-arrow-down-z-a"></i></span><span>Azalan</span>
+                    </button>
+                </div>
+                <div class="field mb-3">
+                    <div class="control has-icons-left">
+                        <input class="input is-small" type="search" placeholder="Değer ara" @bind="_search" @bind:event="oninput" />
+                        <span class="icon is-small is-left"><i class="fas fa-magnifying-glass"></i></span>
+                    </div>
+                </div>
+                <div class="is-flex is-justify-content-space-between mb-2">
+                    <button class="button is-ghost is-small px-0" type="button" @onclick="SelectAll">Tümünü seç</button>
+                    <button class="button is-ghost is-small px-0" type="button" @onclick="ClearSelection">Kaldır</button>
+                </div>
+                <div class="distinct-values mb-3">
+                    @foreach (var value in DisplayedValues)
+                    {
+                        <label class="checkbox is-flex is-justify-content-space-between py-1">
+                            <span class="mr-4">
+                                <input class="mr-2" type="checkbox" checked="@_selected.Contains(value.Key)"
+                                       @onchange="args => ToggleValue(value.Key, args)" />
+                                @value.Label
+                            </span>
+                            <span class="tag is-light">@value.Count.ToString("N0")</span>
+                        </label>
+                    }
+                </div>
+                @if (MatchingValueCount > MaximumDisplayedValues)
+                {
+                    <p class="help mb-3">İlk @MaximumDisplayedValues değer gösteriliyor. Arama yazarak listeyi daraltın.</p>
+                }
+                <div class="buttons is-right mb-0">
+                    <button class="button is-small" type="button" @onclick="CloseMenu">Vazgeç</button>
+                    <button class="button is-primary is-small" type="button" @onclick="ApplyAsync">Uygula</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ColumnDefinition Column { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<DistinctValue> Values { get; set; } = [];
+    [Parameter] public IReadOnlySet<string>? ActiveValues { get; set; }
+    [Parameter] public EventCallback<SortDirection> OnSort { get; set; }
+    [Parameter] public EventCallback<IReadOnlySet<string>?> OnFilter { get; set; }
+
+    private readonly HashSet<string> _selected = [];
+    private const int MaximumDisplayedValues = 250;
+    private bool IsOpen { get; set; }
+    private string _search = string.Empty;
+    private bool IsFiltered => ActiveValues is not null;
+    private IEnumerable<DistinctValue> MatchingValues => Values.Where(value =>
+        string.IsNullOrWhiteSpace(_search) || value.Label.Contains(_search, StringComparison.CurrentCultureIgnoreCase));
+    private IEnumerable<DistinctValue> DisplayedValues => MatchingValues.Take(MaximumDisplayedValues);
+    private int MatchingValueCount => MatchingValues.Count();
+
+    private void ToggleMenu()
+    {
+        IsOpen = !IsOpen;
+        if (!IsOpen) return;
+        _search = string.Empty;
+        _selected.Clear();
+        _selected.UnionWith(ActiveValues ?? Values.Select(value => value.Key));
+    }
+
+    private void CloseMenu() => IsOpen = false;
+    private void SelectAll() => _selected.UnionWith(MatchingValues.Select(value => value.Key));
+    private void ClearSelection() => _selected.ExceptWith(MatchingValues.Select(value => value.Key));
+
+    private void ToggleValue(string key, ChangeEventArgs args)
+    {
+        if (args.Value is true) _selected.Add(key); else _selected.Remove(key);
+    }
+
+    private async Task SortAsync(SortDirection direction)
+    {
+        await OnSort.InvokeAsync(direction);
+        CloseMenu();
+    }
+
+    private async Task ApplyAsync()
+    {
+        IReadOnlySet<string>? result = _selected.Count == Values.Count ? null : new HashSet<string>(_selected);
+        await OnFilter.InvokeAsync(result);
+        CloseMenu();
+    }
+}

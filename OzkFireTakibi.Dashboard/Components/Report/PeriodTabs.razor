@@ -1,0 +1,31 @@
+<div class="tabs is-toggle is-small mb-0">
+    <ul>
+        <li class="@(SelectedType == ReportPeriodType.Monthly ? "is-active" : null)">
+            <a role="button" aria-disabled="@(Period.Monthly is null)" @onclick="() => SelectAsync(ReportPeriodType.Monthly)">
+                <span class="icon"><i class="fas fa-calendar-day"></i></span>
+                <span>Aylık</span>
+            </a>
+        </li>
+        <li class="@(SelectedType == ReportPeriodType.Cumulative ? "is-active" : null)">
+            <a role="button" aria-disabled="@(Period.Cumulative is null)" @onclick="() => SelectAsync(ReportPeriodType.Cumulative)">
+                <span class="icon"><i class="fas fa-chart-line"></i></span>
+                <span>Kümülatif</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ReportPeriodOption Period { get; set; } = default!;
+    [Parameter] public ReportPeriodType SelectedType { get; set; }
+    [Parameter] public EventCallback<ReportPeriodType> SelectedTypeChanged { get; set; }
+
+    private async Task SelectAsync(ReportPeriodType type)
+    {
+        var isAvailable = type == ReportPeriodType.Monthly ? Period.Monthly is not null : Period.Cumulative is not null;
+        if (isAvailable && type != SelectedType)
+        {
+            await SelectedTypeChanged.InvokeAsync(type);
+        }
+    }
+}

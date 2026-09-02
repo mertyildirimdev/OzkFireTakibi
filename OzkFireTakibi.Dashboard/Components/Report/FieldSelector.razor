@@ -1,0 +1,89 @@
+@if (IsOpen)
+{
+    <div class="modal is-active" role="dialog" aria-modal="true" aria-labelledby="field-selector-title">
+        <div class="modal-background" @onclick="CancelAsync"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p id="field-selector-title" class="modal-card-title">Gösterilecek alanlar</p>
+                <button class="delete" type="button" aria-label="Kapat" @onclick="CancelAsync"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="field mb-5">
+                    <div class="control has-icons-left">
+                        <input class="input" type="search" placeholder="Alan ara" @bind="_search" @bind:event="oninput" />
+                        <span class="icon is-left"><i class="fas fa-magnifying-glass"></i></span>
+                    </div>
+                </div>
+                <div class="columns is-multiline">
+                    @foreach (var column in FilteredColumns)
+                    {
+                        <div class="column is-half py-2">
+                            <label class="checkbox">
+                                <input class="mr-2" type="checkbox" checked="@_draft.Contains(column.Key)"
+                                       @onchange="args => Toggle(column.Key, args)" />
+                                @column.Label
+                            </label>
+                        </div>
+                    }
+                </div>
+            </section>
+            <footer class="modal-card-foot is-justify-content-space-between">
+                <div class="buttons mb-0">
+                    <button class="button is-light" type="button" @onclick="SelectDefaults">Önemli alanlar</button>
+                    <button class="button is-light" type="button" @onclick="SelectAll">Tümünü seç</button>
+                </div>
+                <div class="buttons mb-0">
+                    <button class="button" type="button" @onclick="CancelAsync">Vazgeç</button>
+                    <button class="button is-primary" type="button" disabled="@(_draft.Count == 0)" @onclick="ApplyAsync">Uygula</button>
+                </div>
+            </footer>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<ColumnDefinition> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlySet<string> SelectedKeys { get; set; } = new HashSet<string>();
+    [Parameter] public EventCallback<IReadOnlySet<string>> OnApply { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private readonly HashSet<string> _draft = [];
+    private bool _wasOpen;
+    private string _search = string.Empty;
+
+    private IEnumerable<ColumnDefinition> FilteredColumns => Columns.Where(column =>
+        string.IsNullOrWhiteSpace(_search) || column.Label.Contains(_search, StringComparison.CurrentCultureIgnoreCase));
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _draft.Clear();
+            _draft.UnionWith(SelectedKeys);
+            _search = string.Empty;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private void Toggle(string key, ChangeEventArgs args)
+    {
+        if (args.Value is true) _draft.Add(key); else _draft.Remove(key);
+    }
+
+    private void SelectDefaults()
+    {
+        _draft.Clear();
+        _draft.UnionWith(Columns.Where(column => column.IsDefault).Select(column => column.Key));
+    }
+
+    private void SelectAll()
+    {
+        _draft.Clear();
+        _draft.UnionWith(Columns.Select(column => column.Key));
+    }
+
+    private Task ApplyAsync() => OnApply.InvokeAsync(new HashSet<string>(_draft));
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

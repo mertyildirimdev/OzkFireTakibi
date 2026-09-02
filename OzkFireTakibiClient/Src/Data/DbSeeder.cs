@@ -28,7 +28,8 @@ public static class DbSeeder
             {
                 Name = "System Admin",
                 Email = "admin@ozkfiretakibi.local",
-                Password = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                // Password = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                Password = "admin123",
                 Role = UserRole.Admin.ToString(),
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -38,7 +39,8 @@ public static class DbSeeder
             {
                 Name = "Normal User",
                 Email = "user@ozkfiretakibi.local",
-                Password = BCrypt.Net.BCrypt.HashPassword("user123"),
+                // Password = BCrypt.Net.BCrypt.HashPassword("user123"),
+                Password = "user123",
                 Role = UserRole.User.ToString(),
                 CreatedAt = now,
                 UpdatedAt = now,

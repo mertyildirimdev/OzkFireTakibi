@@ -1,0 +1,16 @@
+@inject NavigationManager NavigationManager
+
+<div class="is-flex is-justify-content-center p-6">
+    <progress class="progress is-primary is-small" max="100">Giriş sayfasına yönlendiriliyor</progress>
+</div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var returnUrl = string.IsNullOrWhiteSpace(relativePath) ? "/" : $"/{relativePath}";
+        NavigationManager.NavigateTo($"/giris?returnUrl={Uri.EscapeDataString(returnUrl)}", replace: true);
+    }
+}

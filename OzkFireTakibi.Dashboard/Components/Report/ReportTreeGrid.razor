@@ -1,0 +1,230 @@
+<div class="table-container report-table-container">
+    <table class="table is-fullwidth is-hoverable is-striped is-narrow">
+        <thead>
+            <tr>
+                <th class="tree-column">Kırılım</th>
+                @foreach (var column in Columns)
+                {
+                    <th class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
+                        <ColumnFilterMenu Column="column"
+                                          Values="GetDistinctValues(column)"
+                                          ActiveValues="GetActiveValues(column.Key)"
+                                          OnSort="direction => SortAsync(column.Key, direction)"
+                                          OnFilter="values => FilterAsync(column.Key, values)" />
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in VisibleRows)
+            {
+                <tr class="@RowClass(row.Level)">
+                    <td>
+                        <div class="tree-label level-@row.Level.ToString().ToLowerInvariant()">
+                            @if (row.HasChildren)
+                            {
+                                <button class="button is-small is-white" type="button"
+                                        aria-label="@(row.IsExpanded ? "Daralt" : "Genişlet")"
+                                        aria-expanded="@row.IsExpanded" @onclick="() => Toggle(row.Key)">
+                                    <span class="icon is-small">
+                                        <i class="fas @(row.IsExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
+                                    </span>
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="tree-placeholder" aria-hidden="true"></span>
+                            }
+                            <span>
+                                <strong>@RowTitle(row)</strong>
+                                @if (!string.IsNullOrWhiteSpace(RowCode(row)))
+                                {
+                                    <span class="tag is-light ml-2">@RowCode(row)</span>
+                                }
+                            </span>
+                        </div>
+                    </td>
+                    @foreach (var column in Columns)
+                    {
+                        <td class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
+                            @column.Format(row.Data)
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="is-flex is-justify-content-space-between is-align-items-center mt-3">
+    <p class="is-size-7 has-text-grey"><strong>@VisibleRows.Count.ToString("N0")</strong> görünür satır</p>
+    @if (_expandedKeys.Count > 0)
+    {
+        <button class="button is-small is-light" type="button" @onclick="CollapseAll">
+            <span class="icon"><i class="fas fa-compress"></i></span><span>Tümünü daralt</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ReportSnapshot Snapshot { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<ColumnDefinition> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, IReadOnlySet<string>> Filters { get; set; }
+        = new Dictionary<string, IReadOnlySet<string>>();
+    [Parameter] public SortRule? Sort { get; set; }
+    [Parameter] public string GlobalSearch { get; set; } = string.Empty;
+    [Parameter] public EventCallback<SortRule> OnSortChanged { get; set; }
+    [Parameter] public EventCallback<ColumnFilterChange> OnFilterChanged { get; set; }
+
+    private readonly HashSet<string> _expandedKeys = [];
+    private long _snapshotImportId;
+
+    protected override void OnParametersSet()
+    {
+        if (_snapshotImportId != Snapshot.Import.Id)
+        {
+            _snapshotImportId = Snapshot.Import.Id;
+            _expandedKeys.Clear();
+        }
+    }
+
+    private IReadOnlyList<ReportTreeRow> VisibleRows
+    {
+        get
+        {
+            var matchingStores = Snapshot.StoreProducts.Where(MatchesGlobalSearch).Where(row => MatchesFilters(row)).ToArray();
+            var matchingStoreIds = matchingStores.Select(row => row.Id).ToHashSet();
+            var allowedProducts = matchingStores.Select(ReportSnapshot.ProductKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var allowedCategories = matchingStores.Select(ReportSnapshot.CategoryKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var rows = new List<ReportTreeRow>
+            {
+                new("general", ReportTreeLevel.General, Snapshot.General, false, false)
+            };
+
+            foreach (var category in SortRows(Snapshot.Categories.Where(row => allowedCategories.Contains(ReportSnapshot.CategoryKey(row)))))
+            {
+                var categoryKey = ReportSnapshot.CategoryKey(category);
+                var nodeKey = $"category|{categoryKey}";
+                var isExpanded = _expandedKeys.Contains(nodeKey);
+                var products = Snapshot.ProductsByCategory.GetValueOrDefault(categoryKey, [])
+                    .Where(row => allowedProducts.Contains(ReportSnapshot.ProductKey(row)));
+                var sortedProducts = SortRows(products).ToArray();
+                rows.Add(new(nodeKey, ReportTreeLevel.Category, category, sortedProducts.Length > 0, isExpanded));
+
+                if (!isExpanded) continue;
+                foreach (var product in sortedProducts)
+                {
+                    var productKey = ReportSnapshot.ProductKey(categoryKey, product);
+                    var productNodeKey = $"product|{productKey}";
+                    var productExpanded = _expandedKeys.Contains(productNodeKey);
+                    var stores = Snapshot.StoresByProduct.GetValueOrDefault(productKey, [])
+                        .Where(row => matchingStoreIds.Contains(row.Id));
+                    var sortedStores = SortRows(stores).ToArray();
+                    rows.Add(new(productNodeKey, ReportTreeLevel.Product, product, sortedStores.Length > 0, productExpanded));
+
+                    if (!productExpanded) continue;
+                    rows.AddRange(sortedStores.Select(store => new ReportTreeRow(
+                        $"store|{productKey}|{store.StoreNumber}|{store.Id}",
+                        ReportTreeLevel.Store,
+                        store,
+                        false,
+                        false)));
+                }
+            }
+
+            return rows;
+        }
+    }
+
+    private IReadOnlyList<DistinctValue> GetDistinctValues(ColumnDefinition column)
+    {
+        return Snapshot.StoreProducts
+            .Where(MatchesGlobalSearch)
+            .Where(row => MatchesFilters(row, column.Key))
+            .GroupBy(column.ValueKey)
+            .Select(group => new DistinctValue(
+                group.Key,
+                string.IsNullOrWhiteSpace(group.Key) ? "(Boş)" : column.Format(group.First()),
+                group.Count()))
+            .OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    private IReadOnlySet<string>? GetActiveValues(string columnKey) => Filters.GetValueOrDefault(columnKey);
+
+    private bool MatchesFilters(ReportRowRecord row, string? excludedColumn = null)
+    {
+        foreach (var filter in Filters)
+        {
+            if (filter.Key == excludedColumn) continue;
+            var column = ReportColumnCatalog.All.First(item => item.Key == filter.Key);
+            if (!filter.Value.Contains(column.ValueKey(row))) return false;
+        }
+
+        return true;
+    }
+
+    private bool MatchesGlobalSearch(ReportRowRecord row)
+    {
+        if (string.IsNullOrWhiteSpace(GlobalSearch)) return true;
+        return new[] { row.CategoryCode, row.CategoryName, row.StockCode, row.StockName, row.StoreName, row.StoreNumber?.ToString() }
+            .Any(value => value?.Contains(GlobalSearch, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+
+    private IEnumerable<ReportRowRecord> SortRows(IEnumerable<ReportRowRecord> rows)
+    {
+        if (Sort is null) return rows.OrderBy(row => row.SourceRowNumber);
+        var column = ReportColumnCatalog.All.First(item => item.Key == Sort.ColumnKey);
+        return Sort.Direction == SortDirection.Ascending
+            ? rows.OrderBy(column.Value, ObjectValueComparer.Instance)
+            : rows.OrderByDescending(column.Value, ObjectValueComparer.Instance);
+    }
+
+    private void Toggle(string key)
+    {
+        if (!_expandedKeys.Add(key)) _expandedKeys.Remove(key);
+    }
+
+    private void CollapseAll() => _expandedKeys.Clear();
+    private Task SortAsync(string columnKey, SortDirection direction) => OnSortChanged.InvokeAsync(new SortRule(columnKey, direction));
+    private Task FilterAsync(string columnKey, IReadOnlySet<string>? values) => OnFilterChanged.InvokeAsync(new ColumnFilterChange(columnKey, values));
+
+    private static string RowTitle(ReportTreeRow row) => row.Level switch
+    {
+        ReportTreeLevel.General => "Genel toplam",
+        ReportTreeLevel.Category => row.Data.CategoryName ?? "İsimsiz kategori",
+        ReportTreeLevel.Product => row.Data.StockName ?? "İsimsiz ürün",
+        ReportTreeLevel.Store => row.Data.StoreName ?? "İsimsiz mağaza",
+        _ => "–"
+    };
+
+    private static string? RowCode(ReportTreeRow row) => row.Level switch
+    {
+        ReportTreeLevel.Category => row.Data.CategoryCode,
+        ReportTreeLevel.Product => row.Data.StockCode,
+        ReportTreeLevel.Store => row.Data.StoreNumber?.ToString(),
+        _ => null
+    };
+
+    private static string? RowClass(ReportTreeLevel level) => level switch
+    {
+        ReportTreeLevel.General => "has-background-primary-light",
+        ReportTreeLevel.Category => "has-background-info-light",
+        _ => null
+    };
+
+    private sealed class ObjectValueComparer : IComparer<object?>
+    {
+        public static readonly ObjectValueComparer Instance = new();
+
+        public int Compare(object? x, object? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return 1;
+            if (y is null) return -1;
+            if (x is decimal xDecimal && y is decimal yDecimal) return xDecimal.CompareTo(yDecimal);
+            if (x is int xInt && y is int yInt) return xInt.CompareTo(yInt);
+            return StringComparer.CurrentCultureIgnoreCase.Compare(x.ToString(), y.ToString());
+        }
+    }
+}

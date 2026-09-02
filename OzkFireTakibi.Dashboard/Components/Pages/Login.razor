@@ -1,0 +1,145 @@
+@page "/giris"
+@layout EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.WebUtilities
+@inject LoginService LoginService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Giriş | ÖZK Fire Takibi</PageTitle>
+
+<section class="hero is-fullheight is-light">
+    <div class="hero-body">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-5-tablet is-4-desktop is-3-widescreen">
+                    <div class="has-text-centered mb-5">
+                        <span class="icon is-large has-text-primary mb-3" aria-hidden="true">
+                            <i class="fas fa-fire-flame-curved fa-2x"></i>
+                        </span>
+                        <h1 class="title is-4">ÖZK Fire Takibi</h1>
+                        <p class="subtitle is-6 has-text-grey">Dashboard hesabınıza giriş yapın</p>
+                    </div>
+
+                    <div class="box p-5">
+                        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                        {
+                            <div class="notification is-danger is-light py-3" role="alert">
+                                <button class="delete is-small" type="button" aria-label="Mesajı kapat" @onclick="() => _errorMessage = null"></button>
+                                @_errorMessage
+                            </div>
+                        }
+
+                        <EditForm Model="_model" OnValidSubmit="LoginAsync" FormName="DashboardLogin">
+                            <DataAnnotationsValidator />
+
+                            <div class="field">
+                                <label class="label" for="email">E-posta</label>
+                                <div class="control has-icons-left">
+                                    <InputText id="email" class="input" type="email" autocomplete="username"
+                                               placeholder="ornek@firma.com" @bind-Value="_model.Email" />
+                                    <span class="icon is-small is-left"><i class="fas fa-envelope"></i></span>
+                                </div>
+                                <ValidationMessage For="@(() => _model.Email)" class="help is-danger" />
+                            </div>
+
+                            <div class="field">
+                                <label class="label" for="password">Şifre</label>
+                                <div class="control has-icons-left">
+                                    <InputText id="password" class="input" type="password" autocomplete="current-password"
+                                               placeholder="••••••••" @bind-Value="_model.Password" />
+                                    <span class="icon is-small is-left"><i class="fas fa-lock"></i></span>
+                                </div>
+                                <ValidationMessage For="@(() => _model.Password)" class="help is-danger" />
+                            </div>
+
+                            <div class="field">
+                                <label class="checkbox">
+                                    <InputCheckbox class="mr-2" @bind-Value="_model.RememberMe" />
+                                    Beni hatırla
+                                </label>
+                            </div>
+
+                            <button class="button is-primary is-fullwidth @(_isProcessing ? "is-loading" : null)"
+                                    type="submit" disabled="@_isProcessing">
+                                Giriş yap
+                            </button>
+                        </EditForm>
+                    </div>
+
+                    <p class="has-text-centered has-text-grey is-size-7">&copy; @DateTime.Now.Year ÖZK Fire Takip Sistemi</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private readonly LoginModel _model = new();
+    private string? _errorMessage;
+    private bool _isProcessing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo(GetSafeReturnUrl(), replace: true);
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        _errorMessage = null;
+        _isProcessing = true;
+
+        try
+        {
+            if (await LoginService.LoginAsync(_model.Email, _model.Password, _model.RememberMe))
+            {
+                NavigationManager.NavigateTo(GetSafeReturnUrl(), replace: true);
+                return;
+            }
+
+            _errorMessage = "E-posta veya şifre hatalı.";
+        }
+        catch
+        {
+            _errorMessage = "Giriş işlemi tamamlanamadı. Lütfen tekrar deneyin.";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private string GetSafeReturnUrl()
+    {
+        var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(currentUri.Query);
+        var candidate = query.TryGetValue("returnUrl", out var values) ? values.FirstOrDefault() : null;
+
+        if (string.IsNullOrWhiteSpace(candidate) ||
+            Uri.TryCreate(candidate, UriKind.Absolute, out _) ||
+            candidate.StartsWith("//", StringComparison.Ordinal) ||
+            candidate.StartsWith('\\') ||
+            candidate.StartsWith("/giris", StringComparison.OrdinalIgnoreCase))
+        {
+            return "/";
+        }
+
+        return candidate.StartsWith('/') ? candidate : $"/{candidate}";
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "E-posta adresi gereklidir.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta adresi girin.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Şifre gereklidir.")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}

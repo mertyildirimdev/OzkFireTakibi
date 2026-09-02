@@ -1,0 +1,7 @@
+.hero {
+    background: var(--bulma-scheme-main-bis);
+}
+
+.navbar {
+    background: var(--bulma-scheme-main);
+}

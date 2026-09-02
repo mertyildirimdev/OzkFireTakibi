@@ -1,0 +1,8 @@
+.dropdown-content {
+    min-width: 20rem;
+}
+
+.distinct-values {
+    max-height: 18rem;
+    overflow-y: auto;
+}

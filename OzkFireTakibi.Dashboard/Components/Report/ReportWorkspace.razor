@@ -1,0 +1,182 @@
+@inject ReportDataService ReportDataService
+@inject NavigationManager NavigationManager
+
+<div class="container is-fluid">
+    @if (_isLoading)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="notification is-danger is-light">@_errorMessage</div>
+    }
+    else if (_period is not null && _snapshot is not null)
+    {
+        <div class="level mb-4">
+            <div class="level-left">
+                <div>
+                    <h1 class="title is-3 mb-1">Fire ve kârlılık analizi</h1>
+                    <p class="subtitle is-6 has-text-grey">@_snapshot.Import.OriginalFileName</p>
+                </div>
+            </div>
+            <div class="level-right">
+                <div class="field">
+                    <label class="label is-small" for="period-select">Dönem</label>
+                    <div class="select">
+                        <select id="period-select" value="@_period.Id" @onchange="ChangePeriod">
+                            @foreach (var period in _periods)
+                            {
+                                <option value="@period.Id">@period.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="box mb-4">
+            <div class="level is-mobile mb-4">
+                <div class="level-left">
+                    <PeriodTabs Period="_period" SelectedType="_selectedType" SelectedTypeChanged="SelectPeriodTypeAsync" />
+                </div>
+                <div class="level-right">
+                    <span class="tag is-light">
+                        @_snapshot.Import.StartDate.ToString("dd.MM.yyyy") – @_snapshot.Import.EndDate.ToString("dd.MM.yyyy")
+                    </span>
+                </div>
+            </div>
+
+            <div class="columns is-variable is-2 is-align-items-flex-end">
+                <div class="column is-5">
+                    <label class="label is-small" for="global-search">Tüm verilerde ara</label>
+                    <div class="control has-icons-left">
+                        <input id="global-search" class="input" type="search" placeholder="Kategori, ürün veya mağaza"
+                               @bind="_globalSearch" @bind:event="oninput" />
+                        <span class="icon is-left"><i class="fas fa-magnifying-glass"></i></span>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="buttons is-right">
+                        @if (_filters.Count > 0)
+                        {
+                            <button class="button is-light" type="button" @onclick="ClearFilters">
+                                <span class="icon"><i class="fas fa-filter-circle-xmark"></i></span>
+                                <span>@_filters.Count filtreyi temizle</span>
+                            </button>
+                        }
+                        <button class="button is-primary is-light" type="button" @onclick="() => _fieldSelectorOpen = true">
+                            <span class="icon"><i class="fas fa-table-columns"></i></span>
+                            <span>Alanlar (@_selectedFieldKeys.Count)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ReportTreeGrid Snapshot="_snapshot"
+                        Columns="VisibleColumns"
+                        Filters="_filters"
+                        Sort="_sort"
+                        GlobalSearch="_globalSearch"
+                        OnSortChanged="HandleSortChanged"
+                        OnFilterChanged="HandleFilterChanged" />
+
+        <FieldSelector IsOpen="_fieldSelectorOpen"
+                       Columns="ReportColumnCatalog.All"
+                       SelectedKeys="_selectedFieldKeys"
+                       OnApply="ApplyFields"
+                       OnCancel="CloseFieldSelector" />
+    }
+</div>
+
+@code {
+    [Parameter] public long PeriodId { get; set; }
+
+    private IReadOnlyList<ReportPeriodOption> _periods = [];
+    private ReportPeriodOption? _period;
+    private ReportSnapshot? _snapshot;
+    private ReportPeriodType _selectedType;
+    private readonly HashSet<string> _selectedFieldKeys = ReportColumnCatalog.All.Where(x => x.IsDefault).Select(x => x.Key).ToHashSet();
+    private readonly Dictionary<string, IReadOnlySet<string>> _filters = [];
+    private SortRule? _sort;
+    private string _globalSearch = string.Empty;
+    private string? _errorMessage;
+    private bool _isLoading;
+    private bool _fieldSelectorOpen;
+    private long _loadedPeriodId;
+
+    private IReadOnlyList<ColumnDefinition> VisibleColumns => ReportColumnCatalog.All.Where(x => _selectedFieldKeys.Contains(x.Key)).ToArray();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedPeriodId == PeriodId && _snapshot is not null) return;
+        await LoadPeriodAsync();
+    }
+
+    private async Task LoadPeriodAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            _periods = await ReportDataService.GetPeriodsAsync();
+            _period = _periods.FirstOrDefault(x => x.Id == PeriodId) ?? _periods.FirstOrDefault();
+            if (_period is null) throw new InvalidOperationException("Görüntülenecek aktif rapor bulunamadı.");
+            _loadedPeriodId = _period.Id;
+            _selectedType = _period.Monthly is not null ? ReportPeriodType.Monthly : ReportPeriodType.Cumulative;
+            await LoadSnapshotAsync();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Rapor verileri yüklenemedi: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SelectPeriodTypeAsync(ReportPeriodType type)
+    {
+        _selectedType = type;
+        _isLoading = true;
+        try { await LoadSnapshotAsync(); }
+        catch (Exception exception) { _errorMessage = $"Rapor verileri yüklenemedi: {exception.Message}"; }
+        finally { _isLoading = false; }
+    }
+
+    private async Task LoadSnapshotAsync()
+    {
+        var importItem = _selectedType == ReportPeriodType.Monthly ? _period?.Monthly : _period?.Cumulative;
+        if (importItem is null) throw new InvalidOperationException("Seçilen rapor türü bu dönemde bulunmuyor.");
+        _snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
+    }
+
+    private void ChangePeriod(ChangeEventArgs args)
+    {
+        if (long.TryParse(args.Value?.ToString(), out var periodId)) NavigationManager.NavigateTo($"/rapor/{periodId}");
+    }
+
+    private void HandleSortChanged(SortRule rule) => _sort = rule;
+
+    private void HandleFilterChanged(ColumnFilterChange change)
+    {
+        if (change.SelectedValues is null) _filters.Remove(change.ColumnKey);
+        else _filters[change.ColumnKey] = change.SelectedValues;
+    }
+
+    private void ClearFilters()
+    {
+        _filters.Clear();
+        _sort = null;
+    }
+
+    private void ApplyFields(IReadOnlySet<string> keys)
+    {
+        _selectedFieldKeys.Clear();
+        _selectedFieldKeys.UnionWith(keys);
+        _fieldSelectorOpen = false;
+    }
+
+    private void CloseFieldSelector() => _fieldSelectorOpen = false;
+}

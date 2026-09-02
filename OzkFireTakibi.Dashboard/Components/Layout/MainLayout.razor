@@ -1,0 +1,80 @@
+@inherits LayoutComponentBase
+@inject LoginService LoginService
+@inject NavigationManager NavigationManager
+
+<div class="hero is-fullheight">
+    <nav class="navbar has-shadow" role="navigation" aria-label="Ana menü">
+        <div class="container is-fluid">
+            <div class="navbar-brand">
+                <NavLink class="navbar-item has-text-weight-semibold is-size-5" href="" Match="NavLinkMatch.All">
+                    <span class="icon-text">
+                        <span class="icon has-text-primary" aria-hidden="true"><i class="fas fa-fire-flame-curved"></i></span>
+                        <span>ÖZK Fire Takibi</span>
+                    </span>
+                </NavLink>
+                <button class="navbar-burger @(_menuOpen ? "is-active" : null)" type="button"
+                        aria-label="Menüyü aç veya kapat" aria-expanded="@_menuOpen" @onclick="ToggleMenu">
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                </button>
+            </div>
+            <div class="navbar-menu @(_menuOpen ? "is-active" : null)">
+                <div class="navbar-start">
+                    <NavLink class="navbar-item" ActiveClass="has-text-primary has-text-weight-semibold"
+                             href="" Match="NavLinkMatch.All" @onclick="CloseMenu">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-chart-pie"></i></span>
+                            <span>Dashboard</span>
+                        </span>
+                    </NavLink>
+                </div>
+                <div class="navbar-end">
+                    <AuthorizeView>
+                        <Authorized>
+                            <div class="navbar-item">
+                                <span class="icon-text has-text-grey-dark">
+                                    <span class="icon" aria-hidden="true"><i class="fas fa-user"></i></span>
+                                    <span>@context.User.Identity?.Name</span>
+                                </span>
+                            </div>
+                            <div class="navbar-item">
+                                <span class="tag is-primary is-light">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                            </div>
+                            <div class="navbar-item">
+                                <button class="button is-light is-small" type="button" @onclick="LogoutAsync">
+                                    <span class="icon"><i class="fas fa-right-from-bracket"></i></span>
+                                    <span>Çıkış yap</span>
+                                </button>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="section is-flex-grow-1">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" class="notification is-danger is-light" data-nosnippet>
+    Bir hata oluştu.
+    <a href="." class="reload has-text-weight-semibold ml-2">Yeniden yükle</a>
+    <span class="dismiss">×</span>
+</div>
+
+@code {
+    private bool _menuOpen;
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+    private void CloseMenu() => _menuOpen = false;
+
+    private async Task LogoutAsync()
+    {
+        CloseMenu();
+        await LoginService.LogoutAsync();
+        NavigationManager.NavigateTo("/giris", replace: true);
+    }
+}

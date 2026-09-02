@@ -58,7 +58,9 @@ public class UserService(IDbContextFactory<AppDbContext> dbContextFactory)
                 u.Email == normalizedEmail &&
                 !u.IsDeleted);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
+        // BCrypt kullanımı devre dışı bırakıldı; parolalar veritabanında doğrudan saklanıyor.
+        // if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
+        if (user is null || user.Password != password)
         {
             return null;
         }
@@ -85,7 +87,8 @@ public class UserService(IDbContextFactory<AppDbContext> dbContextFactory)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
+        // BCrypt kullanımı devre dışı bırakıldı; girilen parola doğrudan kaydediliyor.
+        // user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
         user.CreatedAt = now;
         user.UpdatedAt = now;
         user.IsDeleted = false;

@@ -1,0 +1,149 @@
+@page "/"
+@inject ReportDataService ReportDataService
+
+<PageTitle>ÖZK Fire Takibi Dashboard</PageTitle>
+
+<div class="container">
+    <div class="mb-5">
+        <p class="has-text-primary has-text-weight-semibold mb-2">YÖNETİM ÖZETİ</p>
+        <h1 class="title is-2 mb-2">Fire ve kârlılık görünümü</h1>
+        <p class="subtitle is-6 has-text-grey">Son rapor dönemindeki temel sonuçlar ve dikkat edilmesi gereken kategoriler.</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="notification is-danger is-light">@_errorMessage</div>
+    }
+    else if (_period is null)
+    {
+        <div class="notification is-info is-light">
+            <div class="is-flex is-align-items-center">
+                <span class="icon is-large mr-3" aria-hidden="true"><i class="fas fa-file-excel fa-xl"></i></span>
+                <div>
+                    <p class="has-text-weight-semibold">Henüz rapor yüklenmedi</p>
+                    <p>Yeni Excel dosyaları yüklendiğinde yönetim özeti burada otomatik olarak oluşacak.</p>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_period is not null && _snapshot is not null)
+    {
+        <div class="level mb-5">
+            <div class="level-left">
+                <div>
+                    <p class="heading">Rapor dönemi</p>
+                    <p class="title is-5">@_period.Label</p>
+                </div>
+            </div>
+            <div class="level-right">
+                <NavLink class="button is-primary" href="@($"/rapor/{_period.Id}")">
+                    <span>Detaylı raporu aç</span>
+                    <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                </NavLink>
+            </div>
+        </div>
+
+        <div class="columns is-multiline">
+            <div class="column is-half-tablet is-one-quarter-desktop">
+                <div class="box">
+                    <p class="heading">Mağaza satış tutarı</p>
+                    <p class="title is-4">@FormatNumber(_snapshot.General.StoreSalesAmount)</p>
+                </div>
+            </div>
+            <div class="column is-half-tablet is-one-quarter-desktop">
+                <div class="box">
+                    <p class="heading">Fire tutarı</p>
+                    <p class="title is-4 has-text-danger">@FormatNumber(_snapshot.General.WasteAmount)</p>
+                    <p class="is-size-7 has-text-grey">@FormatRate(_snapshot.General.WasteRate)</p>
+                </div>
+            </div>
+            <div class="column is-half-tablet is-one-quarter-desktop">
+                <div class="box">
+                    <p class="heading">Kâr tutarı</p>
+                    <p class="title is-4 has-text-success">@FormatNumber(_snapshot.General.ProfitAmount)</p>
+                    <p class="is-size-7 has-text-grey">@FormatRate(_snapshot.General.ProfitRate)</p>
+                </div>
+            </div>
+            <div class="column is-half-tablet is-one-quarter-desktop">
+                <div class="box">
+                    <p class="heading">Detay satırı</p>
+                    <p class="title is-4">@_snapshot.StoreProducts.Count.ToString("N0")</p>
+                    <p class="is-size-7 has-text-grey">Mağaza × ürün</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="columns mt-2">
+            <div class="column is-two-thirds">
+                <div class="box">
+                    <div class="level mb-4">
+                        <div class="level-left"><h2 class="title is-5 mb-0">En yüksek fire tutarı olan kategoriler</h2></div>
+                        <div class="level-right"><span class="tag is-danger is-light">İlk 5</span></div>
+                    </div>
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-hoverable">
+                            <thead>
+                                <tr><th>Kategori</th><th class="has-text-right">Fire oranı</th><th class="has-text-right">Fire tutarı</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var category in _snapshot.Categories.OrderBy(row => row.WasteAmount).Take(5))
+                                {
+                                    <tr>
+                                        <td><strong>@category.CategoryName</strong><br /><span class="is-size-7 has-text-grey">@category.CategoryCode</span></td>
+                                        <td class="has-text-right">@FormatRate(category.WasteRate)</td>
+                                        <td class="has-text-right has-text-danger">@FormatNumber(category.WasteAmount)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="column">
+                <div class="box">
+                    <h2 class="title is-5">Rapor kapsamı</h2>
+                    <div class="content">
+                        <p><strong>@_snapshot.Categories.Count.ToString("N0")</strong> kategori</p>
+                        <p><strong>@_snapshot.ProductsByCategory.Values.Sum(rows => rows.Count).ToString("N0")</strong> ürün özeti</p>
+                        <p><strong>@_snapshot.StoreProducts.Select(row => row.StoreNumber).Distinct().Count().ToString("N0")</strong> mağaza</p>
+                    </div>
+                    <hr />
+                    <p class="is-size-7 has-text-grey">@_snapshot.Import.OriginalFileName</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ReportPeriodOption? _period;
+    private ReportSnapshot? _snapshot;
+    private string? _errorMessage;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var periods = await ReportDataService.GetPeriodsAsync();
+            _period = periods.FirstOrDefault();
+            var importItem = _period?.Monthly ?? _period?.Cumulative;
+            if (importItem is not null) _snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Dashboard verileri yüklenemedi: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
+    private static string FormatRate(decimal? value) => value.HasValue ? $"% {value:N2}" : "–";
+}

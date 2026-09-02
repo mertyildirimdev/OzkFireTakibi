@@ -1,0 +1,43 @@
+.report-table-container {
+    max-height: calc(100vh - 21rem);
+    min-height: 24rem;
+    overflow: auto;
+}
+
+table {
+    white-space: nowrap;
+}
+
+thead th {
+    background: var(--bulma-scheme-main);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.tree-column {
+    left: 0;
+    min-width: 22rem;
+    z-index: 3;
+}
+
+tbody td:first-child {
+    background: inherit;
+    left: 0;
+    position: sticky;
+    z-index: 1;
+}
+
+.tree-label {
+    align-items: center;
+    display: flex;
+}
+
+.level-category { padding-left: 1rem; }
+.level-product { padding-left: 2.5rem; }
+.level-store { padding-left: 4rem; }
+
+.tree-placeholder {
+    display: inline-block;
+    width: 2.5rem;
+}
