@@ -2,7 +2,21 @@
     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
         <thead>
             <tr>
-                <th class="breakdown-column">Kırılım</th>
+                <th class="breakdown-column">
+                    <div class="is-flex is-align-items-center is-justify-content-space-between">
+                        <span>Kırılım</span>
+                        <button class="button is-small is-ghost group-toggle-all"
+                                type="button"
+                                title="@(AreAllGroupsExpanded ? "Tüm grupları kapat" : "Tüm grupları aç")"
+                                aria-label="@(AreAllGroupsExpanded ? "Tüm grupları kapat" : "Tüm grupları aç")"
+                                aria-expanded="@(AreAllGroupsExpanded ? "true" : "false")"
+                                @onclick="ToggleAll">
+                            <span class="icon is-small">
+                                <i class="fas @(AreAllGroupsExpanded ? "fa-minus-square" : "fa-plus-square")"></i>
+                            </span>
+                        </button>
+                    </div>
+                </th>
                 @foreach (var column in Columns)
                 {
                     <th class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
@@ -23,12 +37,12 @@
             @foreach (var group in GroupOrder)
             {
                 var rows = MatchingRows(group);
-                var isExpanded = _expandedGroup == group;
+                var isExpanded = _expandedGroups.Contains(group);
                 <tr class="has-background-info-light group-row">
                     <th colspan="@ColumnCount">
                         <button class="button is-ghost is-fullwidth is-justify-content-space-between has-text-left"
                                 type="button"
-                                aria-expanded="@isExpanded"
+                                aria-expanded="@(isExpanded ? "true" : "false")"
                                 @onclick="() => Toggle(group)">
                             <span class="icon-text">
                                 <span class="icon"><i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i></span>
@@ -85,14 +99,8 @@
 <div class="is-flex is-justify-content-space-between is-align-items-center mt-3">
     <p class="is-size-7 has-text-grey">
         <strong>@FilteredRowCount.ToString("N0")</strong> Excel satırı eşleşiyor.
-        Ana kırılımlar Excel sırasındadır ve aynı anda biri açık kalır.
+        Ana kırılımlar Excel sırasındadır ve birbirinden bağımsız açılıp kapatılabilir.
     </p>
-    @if (_expandedGroup is not null)
-    {
-        <button class="button is-small is-light" type="button" @onclick="CollapseAll">
-            <span class="icon"><i class="fas fa-compress"></i></span><span>Daralt</span>
-        </button>
-    }
 </div>
 
 @code {
@@ -117,34 +125,20 @@
         ReportRowType.StoreProduct
     ];
 
-    private ReportRowType? _expandedGroup = ReportRowType.General;
+    private HashSet<ReportRowType> _expandedGroups = new(GroupOrder);
     private long _snapshotImportId;
     private int ColumnCount => Columns.Count + (CanRequestExcuse ? 2 : 1);
     private bool HasActiveFiltering => !string.IsNullOrWhiteSpace(GlobalSearch) || Filters.Count > 0;
     private int FilteredRowCount => Snapshot.Rows.Count(row => MatchesGlobalSearch(row) && MatchesFilters(row));
+    private bool AreAllGroupsExpanded => GroupOrder.All(_expandedGroups.Contains);
 
     protected override void OnParametersSet()
     {
         if (_snapshotImportId != Snapshot.Import.Id)
         {
             _snapshotImportId = Snapshot.Import.Id;
-            _expandedGroup = ReportRowType.General;
+            _expandedGroups = new HashSet<ReportRowType>(GroupOrder);
         }
-
-        if (HasActiveFiltering && (_expandedGroup is null || MatchingRows(_expandedGroup.Value).Count == 0))
-        {
-            _expandedGroup = FirstMatchingGroup();
-        }
-    }
-
-    private ReportRowType? FirstMatchingGroup()
-    {
-        foreach (var group in GroupOrder)
-        {
-            if (MatchingRows(group).Count > 0) return group;
-        }
-
-        return null;
     }
 
     private IReadOnlyList<ReportRowEntity> MatchingRows(ReportRowType group) => Snapshot.Rows
@@ -201,8 +195,20 @@
             : rows.OrderByDescending(column.Value, ObjectValueComparer.Instance).ThenBy(row => row.SourceRowNumber);
     }
 
-    private void Toggle(ReportRowType group) => _expandedGroup = _expandedGroup == group ? null : group;
-    private void CollapseAll() => _expandedGroup = null;
+    private void Toggle(ReportRowType group)
+    {
+        if (!_expandedGroups.Add(group))
+        {
+            _expandedGroups.Remove(group);
+        }
+    }
+
+    private void ToggleAll()
+    {
+        _expandedGroups = AreAllGroupsExpanded
+            ? []
+            : new HashSet<ReportRowType>(GroupOrder);
+    }
     private Task SortAsync(string columnKey, SortDirection direction) => OnSortChanged.InvokeAsync(new SortRule(columnKey, direction));
     private Task FilterAsync(string columnKey, IReadOnlySet<string>? values) => OnFilterChanged.InvokeAsync(new ColumnFilterChange(columnKey, values));
 

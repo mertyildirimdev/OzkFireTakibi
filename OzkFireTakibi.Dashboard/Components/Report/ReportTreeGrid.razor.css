@@ -21,6 +21,13 @@ thead th {
     z-index: 4;
 }
 
+.group-toggle-all {
+    color: var(--bulma-text);
+    height: 1.75rem;
+    min-width: 1.75rem;
+    padding: 0;
+}
+
 tbody td:first-child {
     background: inherit;
     left: 0;
