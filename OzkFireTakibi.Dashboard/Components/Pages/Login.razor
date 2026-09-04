@@ -36,8 +36,8 @@
                             <div class="field">
                                 <label class="label" for="email">E-posta</label>
                                 <div class="control has-icons-left">
-                                    <InputText id="email" class="input" type="email" autocomplete="username"
-                                               placeholder="ornek@firma.com" @bind-Value="_model.Email" />
+                                    <input id="email" class="input" type="email" autocomplete="username"
+                                           placeholder="ornek@firma.com" @bind="_model.Email" @bind:event="oninput" />
                                     <span class="icon is-small is-left"><i class="fas fa-envelope"></i></span>
                                 </div>
                                 <ValidationMessage For="@(() => _model.Email)" class="help is-danger" />
@@ -46,8 +46,8 @@
                             <div class="field">
                                 <label class="label" for="password">Şifre</label>
                                 <div class="control has-icons-left">
-                                    <InputText id="password" class="input" type="password" autocomplete="current-password"
-                                               placeholder="••••••••" @bind-Value="_model.Password" />
+                                    <input id="password" class="input" type="password" autocomplete="current-password"
+                                           placeholder="••••••••" @bind="_model.Password" @bind:event="oninput" />
                                     <span class="icon is-small is-left"><i class="fas fa-lock"></i></span>
                                 </div>
                                 <ValidationMessage For="@(() => _model.Password)" class="help is-danger" />

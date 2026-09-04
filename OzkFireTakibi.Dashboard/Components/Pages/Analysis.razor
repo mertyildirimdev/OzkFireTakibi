@@ -1,0 +1,38 @@
+@page "/analizler"
+@page "/analizler/{PeriodId:long}"
+@inject ReportDataService ReportDataService
+
+<PageTitle>Analizler | ÖZK Fire Takibi</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="container"><progress class="progress is-primary" max="100">Yükleniyor</progress></div>
+}
+else if (_periodId is null)
+{
+    <div class="container">
+        <p class="has-text-primary has-text-weight-semibold mb-2">ANALİZ</p>
+        <h1 class="title is-2">Fire ve kârlılık verileri</h1>
+        <div class="notification is-info is-light">Analiz edilecek rapor bulunmuyor. Önce Raporlar sayfasından aylık ve kümülatif Excel dosyalarını yükleyin.</div>
+    </div>
+}
+else
+{
+    <ReportWorkspace PeriodId="_periodId.Value" RouteBase="/analizler" />
+}
+
+@code {
+    [Parameter] public long? PeriodId { get; set; }
+    private long? _periodId;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        var periods = await ReportDataService.GetPeriodsAsync();
+        _periodId = PeriodId.HasValue && periods.Any(x => x.Id == PeriodId.Value)
+            ? PeriodId.Value
+            : periods.FirstOrDefault()?.Id;
+        _isLoading = false;
+    }
+}

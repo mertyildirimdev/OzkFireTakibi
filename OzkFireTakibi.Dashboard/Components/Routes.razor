@@ -8,7 +8,36 @@
         {
             <AuthorizeView>
                 <Authorized>
-                    <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    @if (routeData.PageType == typeof(Pages.Reports))
+                    {
+                        <AuthorizeView Policy="@ReportPolicies.CanImportReports" Context="reportPolicyContext">
+                            <Authorized>
+                                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                            </Authorized>
+                            <NotAuthorized>
+                                <LayoutView Layout="typeof(Layout.MainLayout)">
+                                    <div class="notification is-danger is-light">Rapor yükleme ekranı için yetkiniz bulunmamaktadır.</div>
+                                </LayoutView>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    }
+                    else if (routeData.PageType == typeof(Pages.ExcuseStores))
+                    {
+                        <AuthorizeView Policy="@ReportPolicies.CanManageExcuseStores" Context="storePolicyContext">
+                            <Authorized>
+                                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                            </Authorized>
+                            <NotAuthorized>
+                                <LayoutView Layout="typeof(Layout.MainLayout)">
+                                    <div class="notification is-danger is-light">Mağaza kapsamı ekranı için yetkiniz bulunmamaktadır.</div>
+                                </LayoutView>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    }
+                    else
+                    {
+                        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    }
                 </Authorized>
                 <NotAuthorized>
                     <RedirectToLogin />

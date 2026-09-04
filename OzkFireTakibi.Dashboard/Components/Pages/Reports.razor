@@ -1,0 +1,323 @@
+@page "/raporlar"
+@using System.Security.Claims
+@using OzkFireTakibi.Dashboard.Importing
+@using OzkFireTakibi.Dashboard.Options
+@using OzkFireTakibi.Dashboard.Services
+@using ImportPeriodType = OzkFireTakibi.Dashboard.Data.Entities.ReportPeriodType
+@inject ReportImportService ReportImportService
+@inject IOptions<ReportImportOptions> ImportOptions
+@inject AuthenticationStateProvider StateProvider
+@implements IAsyncDisposable
+
+<PageTitle>Raporlar | ÖZK Fire Takibi</PageTitle>
+
+<div class="container">
+    <div class="level mb-5">
+        <div class="level-left">
+            <div>
+                <p class="has-text-primary has-text-weight-semibold mb-2">VERİ KAYNAĞI</p>
+                <h1 class="title is-2 mb-2">Rapor ekle</h1>
+                <p class="subtitle is-6 has-text-grey">Aynı döneme ait aylık ve kümülatif Excel dosyalarını birlikte yükleyin.</p>
+            </div>
+        </div>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="notification is-danger is-light">
+            <button class="delete" type="button" aria-label="Kapat" @onclick="ClearError"></button>
+            @errorMessage
+        </div>
+    }
+    @if (successMessage is not null)
+    {
+        <div class="notification is-success is-light">
+            <button class="delete" type="button" aria-label="Kapat" @onclick="ClearSuccess"></button>
+            @successMessage
+        </div>
+    }
+
+    <div class="box mb-5">
+        <div class="columns is-variable is-5">
+            <div class="column">
+                <label class="label">Aylık Excel</label>
+                <p class="help mb-3">Yalnızca seçili ayın hareketlerini içeren dosya.</p>
+                <div class="file is-boxed is-fullwidth has-name">
+                    <label class="file-label">
+                        <InputFile class="file-input" accept=".xls,.xlsx" OnChange="HandleMonthlyFileSelectedAsync" disabled="@isProcessing" />
+                        <span class="file-cta">
+                            <span class="file-icon"><i class="fas fa-file-excel"></i></span>
+                            <span class="file-label">Dosya seç</span>
+                        </span>
+                        <span class="file-name">@(monthlyFileName ?? "Dosya seçilmedi")</span>
+                    </label>
+                </div>
+            </div>
+            <div class="column">
+                <label class="label">Kümülatif Excel</label>
+                <p class="help mb-3">Yıl başından aynı ayın sonuna kadar olan dosya.</p>
+                <div class="file is-boxed is-fullwidth has-name">
+                    <label class="file-label">
+                        <InputFile class="file-input" accept=".xls,.xlsx" OnChange="HandleCumulativeFileSelectedAsync" disabled="@isProcessing" />
+                        <span class="file-cta">
+                            <span class="file-icon"><i class="fas fa-file-excel"></i></span>
+                            <span class="file-label">Dosya seç</span>
+                        </span>
+                        <span class="file-name">@(cumulativeFileName ?? "Dosya seçilmedi")</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        @if (isProcessing)
+        {
+            <progress class="progress is-primary mt-4" max="100">İşleniyor</progress>
+        }
+        else if (pairPreview is not null)
+        {
+            <hr />
+            <div class="level">
+                <div class="level-left">
+                    <div>
+                        <p class="heading">Doğrulanan dönem</p>
+                        <p class="title is-5">@pairPreview.EndDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))</p>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div class="buttons">
+                        <button class="button" type="button" @onclick="ClearSelection">Temizle</button>
+                        <button class="button is-primary" type="button" disabled="@(!pairPreview.HasChanges)" @onclick="ImportPairAsync">
+                            <span class="icon"><i class="fas fa-cloud-arrow-up"></i></span>
+                            <span>İki raporu kaydet</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="columns">
+                @foreach (var file in new[] { pairPreview.MonthlyReport, pairPreview.CumulativeReport })
+                {
+                    <div class="column">
+                        <article class="message @(file.IsAlreadyActive ? "is-info" : "is-success") is-light">
+                            <div class="message-header">
+                                <p>@(file.PeriodType == ImportPeriodType.Monthly ? "Aylık" : "Kümülatif")</p>
+                                <span class="tag">@file.TotalRowCount.ToString("N0") satır</span>
+                            </div>
+                            <div class="message-body">
+                                <p class="has-text-weight-semibold">@file.OriginalFileName</p>
+                                <p class="is-size-7 mt-2">@file.StartDate.ToString("dd.MM.yyyy") – @file.EndDate.ToString("dd.MM.yyyy")</p>
+                            </div>
+                        </article>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="help mt-4">İki dosya seçildiğinde dönem ve içerik eşleşmesi otomatik doğrulanır.</p>
+        }
+    </div>
+
+    <div class="level mb-3">
+        <div class="level-left"><h2 class="title is-4 mb-0">Yüklü dönemler</h2></div>
+        <div class="level-right">
+            <button class="button is-light" type="button" disabled="@isHistoryLoading" @onclick="LoadHistoryAsync">
+                <span class="icon"><i class="fas fa-rotate"></i></span><span>Yenile</span>
+            </button>
+        </div>
+    </div>
+
+    @if (isHistoryLoading)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (reportPeriods.Count == 0)
+    {
+        <div class="notification is-info is-light">Henüz rapor yüklenmedi.</div>
+    }
+    else
+    {
+        <div class="table-container box p-0">
+            <table class="table is-fullwidth is-hoverable mb-0">
+                <thead><tr><th>Dönem</th><th>Aylık</th><th>Kümülatif</th><th class="has-text-right">İşlem</th></tr></thead>
+                <tbody>
+                    @foreach (var period in reportPeriods)
+                    {
+                        <tr>
+                            <td class="has-text-weight-semibold">@period.EndDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))</td>
+                            <td>@(period.MonthlyReport?.OriginalFileName ?? "–")</td>
+                            <td>@(period.CumulativeReport?.OriginalFileName ?? "–")</td>
+                            <td class="has-text-right">
+                                <a class="button is-small is-primary is-light" href="@($"/analizler/{period.Id}")">Analizi aç</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (history.Count > 0)
+    {
+        <details class="mt-5">
+            <summary class="has-text-weight-semibold">Dosya geçmişi (@history.Count)</summary>
+            <div class="table-container mt-3">
+                <table class="table is-fullwidth is-narrow">
+                    <thead><tr><th>Dosya</th><th>Tür</th><th>Durum</th><th class="has-text-right">Satır</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var item in history)
+                        {
+                            <tr>
+                                <td>@item.OriginalFileName</td>
+                                <td>@(item.PeriodType == ImportPeriodType.Monthly ? "Aylık" : "Kümülatif")</td>
+                                <td><span class="tag @(item.IsActive ? "is-success is-light" : "is-light")">@(item.IsActive ? "Aktif" : "Eski sürüm")</span></td>
+                                <td class="has-text-right">@item.TotalRowCount.ToString("N0")</td>
+                                <td class="has-text-right">
+                                    <AuthorizeView Policy="@ReportPolicies.CanDeleteReports">
+                                        <Authorized><button class="button is-small is-danger is-light" type="button" @onclick="() => RequestDelete(item)">Sil</button></Authorized>
+                                    </AuthorizeView>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    }
+</div>
+
+@if (pendingDelete is not null)
+{
+    <div class="modal is-active" role="dialog" aria-modal="true" aria-label="Raporu sil">
+        <div class="modal-background" @onclick="CancelDelete"></div>
+        <div class="modal-card">
+            <header class="modal-card-head"><p class="modal-card-title">Raporu sil</p><button class="delete" type="button" aria-label="Kapat" @onclick="CancelDelete"></button></header>
+            <section class="modal-card-body"><p><strong>@pendingDelete.OriginalFileName</strong> ve ona bağlı satırlar silinecek.</p></section>
+            <footer class="modal-card-foot is-justify-content-flex-end">
+                <button class="button" type="button" disabled="@isDeleting" @onclick="CancelDelete">Vazgeç</button>
+                <button class="button is-danger" type="button" disabled="@isDeleting" @onclick="DeleteReportAsync">Sil</button>
+            </footer>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private IReadOnlyList<ReportImportHistoryItem> history = [];
+    private IReadOnlyList<ReportPeriodOverviewItem> reportPeriods = [];
+    private ReportPairImportPreview? pairPreview;
+    private ReportImportHistoryItem? pendingDelete;
+    private string? monthlyTemporaryFilePath;
+    private string? cumulativeTemporaryFilePath;
+    private string? monthlyFileName;
+    private string? cumulativeFileName;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isProcessing;
+    private bool isHistoryLoading;
+    private bool isDeleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        if (currentUser.Identity?.IsAuthenticated == true) await LoadHistoryAsync();
+    }
+
+    private Task HandleMonthlyFileSelectedAsync(InputFileChangeEventArgs args) => HandleFileAsync(args, ImportPeriodType.Monthly);
+    private Task HandleCumulativeFileSelectedAsync(InputFileChangeEventArgs args) => HandleFileAsync(args, ImportPeriodType.Cumulative);
+
+    private async Task HandleFileAsync(InputFileChangeEventArgs args, ImportPeriodType type)
+    {
+        if (isProcessing) return;
+        isProcessing = true;
+        errorMessage = successMessage = null;
+        pairPreview = null;
+        DeleteTemporaryFile(type);
+        try
+        {
+            var file = args.File;
+            var path = Path.Combine(Path.GetTempPath(), $"ozk-fire-{type.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}.tmp");
+            if (type == ImportPeriodType.Monthly) { monthlyTemporaryFilePath = path; monthlyFileName = file.Name; }
+            else { cumulativeTemporaryFilePath = path; cumulativeFileName = file.Name; }
+
+            await using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var source = file.OpenReadStream(ImportOptions.Value.MaxFileSizeBytes);
+            await source.CopyToAsync(target, cancellationTokenSource.Token);
+
+            if (monthlyTemporaryFilePath is not null && cumulativeTemporaryFilePath is not null && monthlyFileName is not null && cumulativeFileName is not null)
+            {
+                pairPreview = await ReportImportService.PreviewPairAsync(monthlyTemporaryFilePath, monthlyFileName, cumulativeTemporaryFilePath, cumulativeFileName, currentUser, cancellationTokenSource.Token);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = ErrorMessageHelper.GetReportErrorMessage(exception); DeleteTemporaryFile(type); }
+        finally { isProcessing = false; }
+    }
+
+    private async Task ImportPairAsync()
+    {
+        if (isProcessing || pairPreview is null || !pairPreview.HasChanges || monthlyTemporaryFilePath is null || cumulativeTemporaryFilePath is null || monthlyFileName is null || cumulativeFileName is null) return;
+        isProcessing = true;
+        errorMessage = successMessage = null;
+        try
+        {
+            var result = await ReportImportService.ImportPairAsync(monthlyTemporaryFilePath, monthlyFileName, cumulativeTemporaryFilePath, cumulativeFileName, currentUser, cancellationTokenSource.Token);
+            successMessage = "Aylık ve kümülatif rapor paketi kaydedildi.";
+            if (result.GeneratedExcuseCount > 0) successMessage += $" {result.GeneratedExcuseCount:N0} otomatik mazeret açıldı.";
+            ClearSelection();
+            await LoadHistoryAsync();
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = ErrorMessageHelper.GetReportErrorMessage(exception); }
+        finally { isProcessing = false; }
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        if (isHistoryLoading || currentUser.Identity?.IsAuthenticated != true) return;
+        isHistoryLoading = true;
+        try
+        {
+            var historyTask = ReportImportService.GetHistoryAsync(currentUser, cancellationTokenSource.Token);
+            var periodsTask = ReportImportService.GetReportPeriodsAsync(currentUser, cancellationTokenSource.Token);
+            await Task.WhenAll(historyTask, periodsTask);
+            history = await historyTask;
+            reportPeriods = await periodsTask;
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested) { }
+        catch (Exception exception) { errorMessage = ErrorMessageHelper.GetReportErrorMessage(exception); }
+        finally { isHistoryLoading = false; }
+    }
+
+    private void ClearSelection() { pairPreview = null; DeleteAllTemporaryFiles(); }
+    private void RequestDelete(ReportImportHistoryItem item) { if (!isDeleting) pendingDelete = item; }
+    private void CancelDelete() { if (!isDeleting) pendingDelete = null; }
+
+    private async Task DeleteReportAsync()
+    {
+        if (pendingDelete is null || isDeleting) return;
+        isDeleting = true;
+        try
+        {
+            await ReportImportService.DeleteAsync(pendingDelete.Id, currentUser, cancellationTokenSource.Token);
+            pendingDelete = null;
+            successMessage = "Rapor silindi.";
+            await LoadHistoryAsync();
+        }
+        catch (Exception exception) { errorMessage = ErrorMessageHelper.GetReportErrorMessage(exception); }
+        finally { isDeleting = false; }
+    }
+
+    private void DeleteAllTemporaryFiles() { DeleteTemporaryFile(ImportPeriodType.Monthly); DeleteTemporaryFile(ImportPeriodType.Cumulative); }
+    private void DeleteTemporaryFile(ImportPeriodType type)
+    {
+        var path = type == ImportPeriodType.Monthly ? monthlyTemporaryFilePath : cumulativeTemporaryFilePath;
+        try { if (path is not null) File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        if (type == ImportPeriodType.Monthly) { monthlyTemporaryFilePath = null; monthlyFileName = null; }
+        else { cumulativeTemporaryFilePath = null; cumulativeFileName = null; }
+    }
+
+    private void ClearError() => errorMessage = null;
+    private void ClearSuccess() => successMessage = null;
+    public ValueTask DisposeAsync() { cancellationTokenSource.Cancel(); cancellationTokenSource.Dispose(); DeleteAllTemporaryFiles(); return ValueTask.CompletedTask; }
+}

@@ -1,5 +1,5 @@
 using System.Globalization;
-using OzkFireTakibi.Dashboard.Data;
+using OzkFireTakibi.Dashboard.Data.Entities;
 
 namespace OzkFireTakibi.Dashboard.Models;
 
@@ -13,21 +13,18 @@ public sealed record ReportPeriodOption(long Id, DateOnly EndDate, ReportImportO
 public sealed class ReportSnapshot
 {
     public required ReportImportOption Import { get; init; }
-    public required ReportRowRecord General { get; init; }
-    public required IReadOnlyList<ReportRowRecord> Categories { get; init; }
-    public required IReadOnlyDictionary<string, IReadOnlyList<ReportRowRecord>> ProductsByCategory { get; init; }
-    public required IReadOnlyDictionary<string, IReadOnlyList<ReportRowRecord>> StoresByProduct { get; init; }
-    public required IReadOnlyList<ReportRowRecord> StoreProducts { get; init; }
+    public required IReadOnlyList<ReportRowEntity> Rows { get; init; }
+    public required ReportRowEntity General { get; init; }
+    public required IReadOnlyList<ReportRowEntity> Categories { get; init; }
+    public required IReadOnlyDictionary<string, IReadOnlyList<ReportRowEntity>> ProductsByCategory { get; init; }
+    public required IReadOnlyDictionary<string, IReadOnlyList<ReportRowEntity>> StoresByProduct { get; init; }
+    public required IReadOnlyList<ReportRowEntity> StoreProducts { get; init; }
 
-    public static string CategoryKey(ReportRowRecord row) => row.CategoryCode ?? row.CategoryName ?? "(kategori-yok)";
-    public static string StockKey(ReportRowRecord row) => row.StockCode ?? row.StockName ?? "(urun-yok)";
-    public static string ProductKey(ReportRowRecord row) => ProductKey(CategoryKey(row), row);
-    public static string ProductKey(string categoryKey, ReportRowRecord row) => $"{categoryKey}|{StockKey(row)}";
+    public static string CategoryKey(ReportRowEntity row) => row.CategoryCode ?? row.CategoryName ?? "(kategori-yok)";
+    public static string StockKey(ReportRowEntity row) => row.StockCode ?? row.StockName ?? "(urun-yok)";
+    public static string ProductKey(ReportRowEntity row) => ProductKey(CategoryKey(row), row);
+    public static string ProductKey(string categoryKey, ReportRowEntity row) => $"{categoryKey}|{StockKey(row)}";
 }
-
-public enum ReportTreeLevel { General, Category, Product, Store }
-
-public sealed record ReportTreeRow(string Key, ReportTreeLevel Level, ReportRowRecord Data, bool HasChildren, bool IsExpanded);
 
 public enum ColumnDataType { Text, Number, Percentage }
 
@@ -35,10 +32,10 @@ public sealed record ColumnDefinition(
     string Key,
     string Label,
     ColumnDataType DataType,
-    Func<ReportRowRecord, object?> Value,
+    Func<ReportRowEntity, object?> Value,
     bool IsDefault = false)
 {
-    public string ValueKey(ReportRowRecord row)
+    public string ValueKey(ReportRowEntity row)
     {
         var value = Value(row);
         return value switch
@@ -50,7 +47,7 @@ public sealed record ColumnDefinition(
         };
     }
 
-    public string Format(ReportRowRecord row)
+    public string Format(ReportRowEntity row)
     {
         var value = Value(row);
         return value switch

@@ -12,13 +12,13 @@ thead th {
     background: var(--bulma-scheme-main);
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 3;
 }
 
-.tree-column {
+.breakdown-column {
     left: 0;
-    min-width: 22rem;
-    z-index: 3;
+    min-width: 28rem;
+    z-index: 4;
 }
 
 tbody td:first-child {
@@ -28,16 +28,21 @@ tbody td:first-child {
     z-index: 1;
 }
 
-.tree-label {
-    align-items: center;
-    display: flex;
+.group-row th {
+    padding: 0;
+    position: sticky;
+    top: 2.5rem;
+    z-index: 2;
 }
 
-.level-category { padding-left: 1rem; }
-.level-product { padding-left: 2.5rem; }
-.level-store { padding-left: 4rem; }
+.group-row .button {
+    border-radius: 0;
+    color: var(--bulma-text);
+    padding-inline: .75rem;
+    text-decoration: none;
+}
 
-.tree-placeholder {
-    display: inline-block;
-    width: 2.5rem;
+.row-label {
+    align-items: center;
+    display: flex;
 }

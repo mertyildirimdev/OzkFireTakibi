@@ -1,0 +1,142 @@
+@page "/mazeretler"
+@using System.Security.Claims
+@using OzkFireTakibi.Dashboard.Models
+@using OzkFireTakibi.Dashboard.Services
+@using OzkFireTakibi.Dashboard.Data.Entities
+@inject ExcuseService ExcuseService
+@inject AuthenticationStateProvider StateProvider
+@implements IAsyncDisposable
+
+<PageTitle>Mazeretler | ÖZK Fire Takibi</PageTitle>
+
+<div class="container">
+    <div class="level mb-5">
+        <div class="level-left">
+            <div>
+                <p class="has-text-primary has-text-weight-semibold mb-2">İŞ AKIŞI</p>
+                <h1 class="title is-2 mb-2">Mazeretler</h1>
+                <p class="subtitle is-6 has-text-grey">Fire eşiğini aşan mağazaların açıklama ve değerlendirme süreci.</p>
+            </div>
+        </div>
+        <div class="level-right">
+            <AuthorizeView Policy="@ReportPolicies.CanManageExcuseStores">
+                <Authorized><a class="button is-light" href="/mazeretler/magazalar"><span class="icon"><i class="fas fa-store"></i></span><span>Mağaza kapsamı</span></a></Authorized>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="notification is-danger is-light">@errorMessage</div>
+    }
+    else if (isLoading)
+    {
+        <progress class="progress is-primary" max="100">Yükleniyor</progress>
+    }
+    else if (result is not null)
+    {
+        <div class="columns is-multiline mb-4">
+            @foreach (var metric in Metrics)
+            {
+                <div class="column is-half-tablet is-one-quarter-desktop">
+                    <button class="box has-text-left is-fullwidth" type="button" @onclick="() => selectedStatus = metric.Value">
+                        <p class="heading">@metric.Label</p><p class="title is-4">@metric.Count</p>
+                    </button>
+                </div>
+            }
+        </div>
+
+        <div class="box">
+            <div class="columns is-variable is-3">
+                <div class="column is-two-thirds">
+                    <label class="label is-small" for="excuse-search">Ara</label>
+                    <div class="control has-icons-left">
+                        <input id="excuse-search" class="input" type="search" placeholder="Mağaza, kategori, ürün veya rapor" @bind="searchText" @bind:event="oninput" />
+                        <span class="icon is-left"><i class="fas fa-magnifying-glass"></i></span>
+                    </div>
+                </div>
+                <div class="column">
+                    <label class="label is-small" for="excuse-status">Durum</label>
+                    <div class="select is-fullwidth">
+                        <select id="excuse-status" @bind="selectedStatus">
+                            <option value="">Tüm aktif durumlar</option>
+                            @foreach (var status in Enum.GetValues<ExcuseStatus>().Where(x => x != ExcuseStatus.Superseded))
+                            {
+                                <option value="@status.ToString()">@ExcuseDisplayNames.Status(status)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (FilteredItems.Count == 0)
+        {
+            <div class="notification is-info is-light">Filtreye uyan mazeret bulunamadı.</div>
+        }
+        else
+        {
+            <div>
+                @foreach (var item in FilteredItems)
+                {
+                    <details class="box py-4 mb-3">
+                        <summary class="is-clickable">
+                            <span class="tag @ExcuseDisplayNames.StatusCss(item.Status) mr-2">@ExcuseDisplayNames.Status(item.Status)</span>
+                            <strong>@item.StoreName</strong>
+                            <span class="has-text-grey ml-2">@DisplayTarget(item)</span>
+                        </summary>
+                        <div class="columns is-multiline mt-4 mb-1">
+                            <div class="column is-half-tablet is-one-quarter-desktop"><p class="heading">Dönem</p><p>@item.PeriodEndDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))</p></div>
+                            <div class="column is-half-tablet is-one-quarter-desktop"><p class="heading">Tür</p><p>@ExcuseDisplayNames.Source(item.Source) · @ExcuseDisplayNames.Target(item.TargetRowType)</p></div>
+                            <div class="column is-half-tablet is-one-quarter-desktop"><p class="heading">Mağaza fire oranı</p><p class="has-text-danger has-text-weight-semibold">@FormatRate(item.StoreRate)</p></div>
+                            <div class="column is-half-tablet is-one-quarter-desktop"><p class="heading">Referanstan sapma</p><p>@FormatPercent(item.DeviationPercent)</p></div>
+                        </div>
+                        <div class="is-flex is-justify-content-space-between is-align-items-center">
+                            <p class="is-size-7 has-text-grey">@item.ReportName</p>
+                            <a class="button is-small is-primary is-light" href="@($"/mazeretler/{item.Id}")">Detayı aç</a>
+                        </div>
+                    </details>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
+    private ExcuseListResult? result;
+    private string selectedStatus = string.Empty;
+    private string searchText = string.Empty;
+    private string? errorMessage;
+    private bool isLoading;
+
+    private IReadOnlyList<(string Label, int Count, string Value)> Metrics => result is null ? [] :
+    [
+        ("Açık", result.OpenCount, ExcuseStatus.Open.ToString()),
+        ("Yanıtlandı", result.AnsweredCount, ExcuseStatus.Answered.ToString()),
+        ("Revizyon istendi", result.RevisionRequestedCount, ExcuseStatus.RevisionRequested.ToString()),
+        ("Onaylandı", result.ApprovedCount, ExcuseStatus.Approved.ToString())
+    ];
+
+    private IReadOnlyList<ExcuseListItem> FilteredItems => result?.Items.Where(item =>
+        (string.IsNullOrEmpty(selectedStatus) || item.Status.ToString() == selectedStatus) &&
+        (string.IsNullOrWhiteSpace(searchText) || SearchText(item).Contains(searchText.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+        .ToArray() ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        if (currentUser.Identity?.IsAuthenticated != true) return;
+        isLoading = true;
+        try { result = await ExcuseService.GetListAsync(currentUser, null, null, 1, cancellationTokenSource.Token); }
+        catch (Exception exception) { errorMessage = exception.Message; }
+        finally { isLoading = false; }
+    }
+
+    private static string SearchText(ExcuseListItem item) => $"{item.StoreName} {item.StoreNumber} {item.TargetName} {item.TargetCode} {item.ReportName}";
+    private static string DisplayTarget(ExcuseListItem item) => string.Join(" · ", new[] { item.TargetName, item.TargetCode }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    private static string FormatRate(decimal? value) => value.HasValue ? $"%{value.Value:N2}" : "–";
+    private static string FormatPercent(decimal? value) => value.HasValue ? $"%{value.Value:N0}" : "–";
+    public ValueTask DisposeAsync() { cancellationTokenSource.Cancel(); cancellationTokenSource.Dispose(); return ValueTask.CompletedTask; }
+}

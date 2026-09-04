@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
-using OzkFireTakibi.Dashboard.Data;
 using OzkFireTakibi.Dashboard.Services;
+using OzkFireTakibi.Dashboard.Data.Entities;
 
 namespace OzkFireTakibi.Dashboard.Authentication;
 
@@ -12,10 +12,10 @@ public sealed class DashboardAuthenticationStateProvider(
     UserService userService) : AuthenticationStateProvider
 {
     private const string StorageKey = "dashboard_auth_session";
-    private UserRecord? _currentUser;
+    private UserEntity? _currentUser;
     private bool _restoreAttempted;
 
-    public UserRecord? CurrentUser => _currentUser;
+    public UserEntity? CurrentUser => _currentUser;
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -27,7 +27,7 @@ public sealed class DashboardAuthenticationStateProvider(
         return CreateState(_currentUser);
     }
 
-    public async Task SignInAsync(UserRecord user, bool rememberMe)
+    public async Task SignInAsync(UserEntity user, bool rememberMe)
     {
         _currentUser = user;
         _restoreAttempted = true;
@@ -99,7 +99,7 @@ public sealed class DashboardAuthenticationStateProvider(
         try { await sessionStorage.DeleteAsync(StorageKey); } catch { }
     }
 
-    private static AuthenticationState CreateState(UserRecord? user)
+    private static AuthenticationState CreateState(UserEntity? user)
     {
         if (user is null)
         {

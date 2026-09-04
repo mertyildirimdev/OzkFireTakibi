@@ -29,6 +29,31 @@
                             <span>Dashboard</span>
                         </span>
                     </NavLink>
+                    <AuthorizeView Policy="@ReportPolicies.CanImportReports" Context="importContext">
+                        <Authorized>
+                            <NavLink class="navbar-item" ActiveClass="has-text-primary has-text-weight-semibold"
+                                     href="raporlar" @onclick="CloseMenu">
+                                <span class="icon-text">
+                                    <span class="icon"><i class="fas fa-file-arrow-up"></i></span>
+                                    <span>Raporlar</span>
+                                </span>
+                            </NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <NavLink class="navbar-item" ActiveClass="has-text-primary has-text-weight-semibold"
+                             href="analizler" @onclick="CloseMenu">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-chart-column"></i></span>
+                            <span>Analizler</span>
+                        </span>
+                    </NavLink>
+                    <NavLink class="navbar-item" ActiveClass="has-text-primary has-text-weight-semibold"
+                             href="mazeretler" @onclick="CloseMenu">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-comments"></i></span>
+                            <span>Mazeretler</span>
+                        </span>
+                    </NavLink>
                 </div>
                 <div class="navbar-end">
                     <AuthorizeView>

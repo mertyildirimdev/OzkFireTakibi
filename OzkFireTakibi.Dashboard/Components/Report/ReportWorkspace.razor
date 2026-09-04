@@ -1,5 +1,8 @@
 @inject ReportDataService ReportDataService
 @inject NavigationManager NavigationManager
+@inject ExcuseService ExcuseService
+@inject AuthenticationStateProvider StateProvider
+@inject IAuthorizationService AuthorizationService
 
 <div class="container is-fluid">
     @if (_isLoading)
@@ -12,6 +15,10 @@
     }
     else if (_period is not null && _snapshot is not null)
     {
+        @if (_successMessage is not null)
+        {
+            <div class="notification is-success is-light">@_successMessage</div>
+        }
         <div class="level mb-4">
             <div class="level-left">
                 <div>
@@ -77,20 +84,38 @@
                         Columns="VisibleColumns"
                         Filters="_filters"
                         Sort="_sort"
-                        GlobalSearch="_globalSearch"
+                        GlobalSearch="@_globalSearch"
                         OnSortChanged="HandleSortChanged"
-                        OnFilterChanged="HandleFilterChanged" />
+                        OnFilterChanged="HandleFilterChanged"
+                        CanRequestExcuse="@(_canRequestExcuse && _selectedType == ReportPeriodType.Monthly)"
+                        OnExcuseRequested="OpenExcuseModal" />
 
         <FieldSelector IsOpen="_fieldSelectorOpen"
                        Columns="ReportColumnCatalog.All"
                        SelectedKeys="_selectedFieldKeys"
                        OnApply="ApplyFields"
                        OnCancel="CloseFieldSelector" />
+
+        @if (_excuseRow is not null)
+        {
+            <div class="modal is-active" role="dialog" aria-modal="true" aria-label="Mazeret iste">
+                <div class="modal-background" @onclick="CloseExcuseModal"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head"><p class="modal-card-title">Mazeret iste</p><button class="delete" type="button" aria-label="Kapat" @onclick="CloseExcuseModal"></button></header>
+                    <section class="modal-card-body">
+                        <p class="mb-4"><strong>@_excuseRow.StoreName</strong> mağazasından <strong>@ExcuseTargetName</strong> @ExcuseTargetType için açıklama istenecek.</p>
+                        <div class="field"><label class="label" for="excuse-note">Talep notu <span class="has-text-grey has-text-weight-normal">(isteğe bağlı)</span></label><textarea id="excuse-note" class="textarea" rows="4" @bind="_excuseNote"></textarea></div>
+                    </section>
+                    <footer class="modal-card-foot is-justify-content-flex-end"><button class="button" type="button" disabled="@_isCreatingExcuse" @onclick="CloseExcuseModal">Vazgeç</button><button class="button is-warning" type="button" disabled="@_isCreatingExcuse" @onclick="CreateExcuseAsync">Talebi oluştur</button></footer>
+                </div>
+            </div>
+        }
     }
 </div>
 
 @code {
     [Parameter] public long PeriodId { get; set; }
+    [Parameter] public string RouteBase { get; set; } = "/analizler";
 
     private IReadOnlyList<ReportPeriodOption> _periods = [];
     private ReportPeriodOption? _period;
@@ -104,11 +129,23 @@
     private bool _isLoading;
     private bool _fieldSelectorOpen;
     private long _loadedPeriodId;
+    private System.Security.Claims.ClaimsPrincipal _currentUser = new(new System.Security.Claims.ClaimsIdentity());
+    private ReportRowEntity? _excuseRow;
+    private string _excuseNote = string.Empty;
+    private string? _successMessage;
+    private bool _canRequestExcuse;
+    private bool _isCreatingExcuse;
 
     private IReadOnlyList<ColumnDefinition> VisibleColumns => ReportColumnCatalog.All.Where(x => _selectedFieldKeys.Contains(x.Key)).ToArray();
+    private string ExcuseTargetName => _excuseRow?.RowType == ReportRowType.StoreProduct
+        ? _excuseRow.StockName ?? _excuseRow.StockCode ?? "Ürün"
+        : _excuseRow?.CategoryName ?? _excuseRow?.CategoryCode ?? "Kategori";
+    private string ExcuseTargetType => _excuseRow?.RowType == ReportRowType.StoreProduct ? "ürünü" : "kategorisi";
 
     protected override async Task OnParametersSetAsync()
     {
+        _currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
+        _canRequestExcuse = (await AuthorizationService.AuthorizeAsync(_currentUser, ReportPolicies.CanRequestExcuses)).Succeeded;
         if (_loadedPeriodId == PeriodId && _snapshot is not null) return;
         await LoadPeriodAsync();
     }
@@ -154,7 +191,7 @@
 
     private void ChangePeriod(ChangeEventArgs args)
     {
-        if (long.TryParse(args.Value?.ToString(), out var periodId)) NavigationManager.NavigateTo($"/rapor/{periodId}");
+        if (long.TryParse(args.Value?.ToString(), out var periodId)) NavigationManager.NavigateTo($"{RouteBase}/{periodId}");
     }
 
     private void HandleSortChanged(SortRule rule) => _sort = rule;
@@ -179,4 +216,32 @@
     }
 
     private void CloseFieldSelector() => _fieldSelectorOpen = false;
+
+    private void OpenExcuseModal(ReportRowEntity row)
+    {
+        _excuseRow = row;
+        _excuseNote = string.Empty;
+        _successMessage = null;
+    }
+
+    private void CloseExcuseModal()
+    {
+        if (!_isCreatingExcuse) _excuseRow = null;
+    }
+
+    private async Task CreateExcuseAsync()
+    {
+        if (_excuseRow is null || _isCreatingExcuse) return;
+        _isCreatingExcuse = true;
+        _errorMessage = null;
+        try
+        {
+            var excuseId = await ExcuseService.CreateManualRequestAsync(_excuseRow.Id, _excuseNote, _currentUser);
+            _excuseRow = null;
+            _successMessage = "Mazeret talebi oluşturuldu.";
+            NavigationManager.NavigateTo($"/mazeretler/{excuseId}");
+        }
+        catch (Exception exception) { _errorMessage = exception.Message; }
+        finally { _isCreatingExcuse = false; }
+    }
 }

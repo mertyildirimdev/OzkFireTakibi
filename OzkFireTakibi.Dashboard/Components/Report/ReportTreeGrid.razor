@@ -2,7 +2,7 @@
     <table class="table is-fullwidth is-hoverable is-striped is-narrow">
         <thead>
             <tr>
-                <th class="tree-column">Kırılım</th>
+                <th class="breakdown-column">Kırılım</th>
                 @foreach (var column in Columns)
                 {
                     <th class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
@@ -13,55 +13,84 @@
                                           OnFilter="values => FilterAsync(column.Key, values)" />
                     </th>
                 }
+                @if (CanRequestExcuse)
+                {
+                    <th class="has-text-right">İşlem</th>
+                }
             </tr>
         </thead>
         <tbody>
-            @foreach (var row in VisibleRows)
+            @foreach (var group in GroupOrder)
             {
-                <tr class="@RowClass(row.Level)">
-                    <td>
-                        <div class="tree-label level-@row.Level.ToString().ToLowerInvariant()">
-                            @if (row.HasChildren)
-                            {
-                                <button class="button is-small is-white" type="button"
-                                        aria-label="@(row.IsExpanded ? "Daralt" : "Genişlet")"
-                                        aria-expanded="@row.IsExpanded" @onclick="() => Toggle(row.Key)">
-                                    <span class="icon is-small">
-                                        <i class="fas @(row.IsExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
-                                    </span>
-                                </button>
-                            }
-                            else
-                            {
-                                <span class="tree-placeholder" aria-hidden="true"></span>
-                            }
-                            <span>
-                                <strong>@RowTitle(row)</strong>
-                                @if (!string.IsNullOrWhiteSpace(RowCode(row)))
-                                {
-                                    <span class="tag is-light ml-2">@RowCode(row)</span>
-                                }
+                var rows = MatchingRows(group);
+                var isExpanded = _expandedGroup == group;
+                <tr class="has-background-info-light group-row">
+                    <th colspan="@ColumnCount">
+                        <button class="button is-ghost is-fullwidth is-justify-content-space-between has-text-left"
+                                type="button"
+                                aria-expanded="@isExpanded"
+                                @onclick="() => Toggle(group)">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i></span>
+                                <span>
+                                    <strong>@GroupTitle(group)</strong>
+                                    <small class="has-text-grey ml-2">@GroupDescription(group)</small>
+                                </span>
                             </span>
-                        </div>
-                    </td>
-                    @foreach (var column in Columns)
-                    {
-                        <td class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
-                            @column.Format(row.Data)
-                        </td>
-                    }
+                            <span class="tag is-info is-light">@CountLabel(group, rows.Count)</span>
+                        </button>
+                    </th>
                 </tr>
+
+                @if (isExpanded)
+                {
+                    @foreach (var row in SortRows(rows))
+                    {
+                        <tr>
+                            <td>
+                                <div class="row-label">
+                                    <strong>@RowTitle(row)</strong>
+                                    @if (!string.IsNullOrWhiteSpace(RowCode(row)))
+                                    {
+                                        <span class="tag is-light ml-2">@RowCode(row)</span>
+                                    }
+                                    <span class="is-size-7 has-text-grey ml-2">#@row.SourceRowNumber</span>
+                                </div>
+                            </td>
+                            @foreach (var column in Columns)
+                            {
+                                <td class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
+                                    @column.Format(row)
+                                </td>
+                            }
+                            @if (CanRequestExcuse)
+                            {
+                                <td class="has-text-right">
+                                    @if (CanCreateExcuse(row))
+                                    {
+                                        <button class="button is-small is-warning is-light" type="button" @onclick="() => OnExcuseRequested.InvokeAsync(row)">
+                                            <span class="icon"><i class="fas fa-comment-dots"></i></span><span>Mazeret iste</span>
+                                        </button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
             }
         </tbody>
     </table>
 </div>
 
 <div class="is-flex is-justify-content-space-between is-align-items-center mt-3">
-    <p class="is-size-7 has-text-grey"><strong>@VisibleRows.Count.ToString("N0")</strong> görünür satır</p>
-    @if (_expandedKeys.Count > 0)
+    <p class="is-size-7 has-text-grey">
+        <strong>@FilteredRowCount.ToString("N0")</strong> Excel satırı eşleşiyor.
+        Ana kırılımlar Excel sırasındadır ve aynı anda biri açık kalır.
+    </p>
+    @if (_expandedGroup is not null)
     {
         <button class="button is-small is-light" type="button" @onclick="CollapseAll">
-            <span class="icon"><i class="fas fa-compress"></i></span><span>Tümünü daralt</span>
+            <span class="icon"><i class="fas fa-compress"></i></span><span>Daralt</span>
         </button>
     }
 </div>
@@ -75,70 +104,58 @@
     [Parameter] public string GlobalSearch { get; set; } = string.Empty;
     [Parameter] public EventCallback<SortRule> OnSortChanged { get; set; }
     [Parameter] public EventCallback<ColumnFilterChange> OnFilterChanged { get; set; }
+    [Parameter] public bool CanRequestExcuse { get; set; }
+    [Parameter] public EventCallback<ReportRowEntity> OnExcuseRequested { get; set; }
 
-    private readonly HashSet<string> _expandedKeys = [];
+    private static readonly ReportRowType[] GroupOrder =
+    [
+        ReportRowType.General,
+        ReportRowType.CategorySummary,
+        ReportRowType.StoreSummary,
+        ReportRowType.StoreCategory,
+        ReportRowType.ProductSummary,
+        ReportRowType.StoreProduct
+    ];
+
+    private ReportRowType? _expandedGroup = ReportRowType.General;
     private long _snapshotImportId;
+    private int ColumnCount => Columns.Count + (CanRequestExcuse ? 2 : 1);
+    private bool HasActiveFiltering => !string.IsNullOrWhiteSpace(GlobalSearch) || Filters.Count > 0;
+    private int FilteredRowCount => Snapshot.Rows.Count(row => MatchesGlobalSearch(row) && MatchesFilters(row));
 
     protected override void OnParametersSet()
     {
         if (_snapshotImportId != Snapshot.Import.Id)
         {
             _snapshotImportId = Snapshot.Import.Id;
-            _expandedKeys.Clear();
+            _expandedGroup = ReportRowType.General;
         }
-    }
 
-    private IReadOnlyList<ReportTreeRow> VisibleRows
-    {
-        get
+        if (HasActiveFiltering && (_expandedGroup is null || MatchingRows(_expandedGroup.Value).Count == 0))
         {
-            var matchingStores = Snapshot.StoreProducts.Where(MatchesGlobalSearch).Where(row => MatchesFilters(row)).ToArray();
-            var matchingStoreIds = matchingStores.Select(row => row.Id).ToHashSet();
-            var allowedProducts = matchingStores.Select(ReportSnapshot.ProductKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var allowedCategories = matchingStores.Select(ReportSnapshot.CategoryKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var rows = new List<ReportTreeRow>
-            {
-                new("general", ReportTreeLevel.General, Snapshot.General, false, false)
-            };
-
-            foreach (var category in SortRows(Snapshot.Categories.Where(row => allowedCategories.Contains(ReportSnapshot.CategoryKey(row)))))
-            {
-                var categoryKey = ReportSnapshot.CategoryKey(category);
-                var nodeKey = $"category|{categoryKey}";
-                var isExpanded = _expandedKeys.Contains(nodeKey);
-                var products = Snapshot.ProductsByCategory.GetValueOrDefault(categoryKey, [])
-                    .Where(row => allowedProducts.Contains(ReportSnapshot.ProductKey(row)));
-                var sortedProducts = SortRows(products).ToArray();
-                rows.Add(new(nodeKey, ReportTreeLevel.Category, category, sortedProducts.Length > 0, isExpanded));
-
-                if (!isExpanded) continue;
-                foreach (var product in sortedProducts)
-                {
-                    var productKey = ReportSnapshot.ProductKey(categoryKey, product);
-                    var productNodeKey = $"product|{productKey}";
-                    var productExpanded = _expandedKeys.Contains(productNodeKey);
-                    var stores = Snapshot.StoresByProduct.GetValueOrDefault(productKey, [])
-                        .Where(row => matchingStoreIds.Contains(row.Id));
-                    var sortedStores = SortRows(stores).ToArray();
-                    rows.Add(new(productNodeKey, ReportTreeLevel.Product, product, sortedStores.Length > 0, productExpanded));
-
-                    if (!productExpanded) continue;
-                    rows.AddRange(sortedStores.Select(store => new ReportTreeRow(
-                        $"store|{productKey}|{store.StoreNumber}|{store.Id}",
-                        ReportTreeLevel.Store,
-                        store,
-                        false,
-                        false)));
-                }
-            }
-
-            return rows;
+            _expandedGroup = FirstMatchingGroup();
         }
     }
+
+    private ReportRowType? FirstMatchingGroup()
+    {
+        foreach (var group in GroupOrder)
+        {
+            if (MatchingRows(group).Count > 0) return group;
+        }
+
+        return null;
+    }
+
+    private IReadOnlyList<ReportRowEntity> MatchingRows(ReportRowType group) => Snapshot.Rows
+        .Where(row => row.RowType == group)
+        .Where(MatchesGlobalSearch)
+        .Where(row => MatchesFilters(row))
+        .ToArray();
 
     private IReadOnlyList<DistinctValue> GetDistinctValues(ColumnDefinition column)
     {
-        return Snapshot.StoreProducts
+        return Snapshot.Rows
             .Where(MatchesGlobalSearch)
             .Where(row => MatchesFilters(row, column.Key))
             .GroupBy(column.ValueKey)
@@ -152,7 +169,7 @@
 
     private IReadOnlySet<string>? GetActiveValues(string columnKey) => Filters.GetValueOrDefault(columnKey);
 
-    private bool MatchesFilters(ReportRowRecord row, string? excludedColumn = null)
+    private bool MatchesFilters(ReportRowEntity row, string? excludedColumn = null)
     {
         foreach (var filter in Filters)
         {
@@ -164,54 +181,82 @@
         return true;
     }
 
-    private bool MatchesGlobalSearch(ReportRowRecord row)
+    private bool MatchesGlobalSearch(ReportRowEntity row)
     {
         if (string.IsNullOrWhiteSpace(GlobalSearch)) return true;
-        return new[] { row.CategoryCode, row.CategoryName, row.StockCode, row.StockName, row.StoreName, row.StoreNumber?.ToString() }
+        return new[]
+            {
+                row.SourceReportType, row.CategoryCode, row.CategoryName, row.StockCode, row.StockName,
+                row.StoreName, row.StoreNumber?.ToString()
+            }
             .Any(value => value?.Contains(GlobalSearch, StringComparison.CurrentCultureIgnoreCase) == true);
     }
 
-    private IEnumerable<ReportRowRecord> SortRows(IEnumerable<ReportRowRecord> rows)
+    private IEnumerable<ReportRowEntity> SortRows(IEnumerable<ReportRowEntity> rows)
     {
         if (Sort is null) return rows.OrderBy(row => row.SourceRowNumber);
         var column = ReportColumnCatalog.All.First(item => item.Key == Sort.ColumnKey);
         return Sort.Direction == SortDirection.Ascending
-            ? rows.OrderBy(column.Value, ObjectValueComparer.Instance)
-            : rows.OrderByDescending(column.Value, ObjectValueComparer.Instance);
+            ? rows.OrderBy(column.Value, ObjectValueComparer.Instance).ThenBy(row => row.SourceRowNumber)
+            : rows.OrderByDescending(column.Value, ObjectValueComparer.Instance).ThenBy(row => row.SourceRowNumber);
     }
 
-    private void Toggle(string key)
-    {
-        if (!_expandedKeys.Add(key)) _expandedKeys.Remove(key);
-    }
-
-    private void CollapseAll() => _expandedKeys.Clear();
+    private void Toggle(ReportRowType group) => _expandedGroup = _expandedGroup == group ? null : group;
+    private void CollapseAll() => _expandedGroup = null;
     private Task SortAsync(string columnKey, SortDirection direction) => OnSortChanged.InvokeAsync(new SortRule(columnKey, direction));
     private Task FilterAsync(string columnKey, IReadOnlySet<string>? values) => OnFilterChanged.InvokeAsync(new ColumnFilterChange(columnKey, values));
 
-    private static string RowTitle(ReportTreeRow row) => row.Level switch
+    private string CountLabel(ReportRowType group, int filteredCount)
     {
-        ReportTreeLevel.General => "Genel toplam",
-        ReportTreeLevel.Category => row.Data.CategoryName ?? "İsimsiz kategori",
-        ReportTreeLevel.Product => row.Data.StockName ?? "İsimsiz ürün",
-        ReportTreeLevel.Store => row.Data.StoreName ?? "İsimsiz mağaza",
+        var total = Snapshot.Rows.Count(row => row.RowType == group);
+        return HasActiveFiltering ? $"{filteredCount:N0} / {total:N0}" : $"{total:N0} satır";
+    }
+
+    private static string GroupTitle(ReportRowType group) => group switch
+    {
+        ReportRowType.General => "Genel Durum",
+        ReportRowType.CategorySummary => "Genel Durum Grup Detaylı",
+        ReportRowType.StoreSummary => "Şubeler Genel Durum",
+        ReportRowType.StoreCategory => "Şubeler Grup Detaylı",
+        ReportRowType.ProductSummary => "Stoklar Genel",
+        ReportRowType.StoreProduct => "Şubeler Stok Detaylı",
+        _ => group.ToString()
+    };
+
+    private static string GroupDescription(ReportRowType group) => group switch
+    {
+        ReportRowType.General => "Rapor toplamı",
+        ReportRowType.CategorySummary => "Kategori özetleri",
+        ReportRowType.StoreSummary => "Mağaza özetleri",
+        ReportRowType.StoreCategory => "Mağaza ve kategori satırları",
+        ReportRowType.ProductSummary => "Ürün özetleri",
+        ReportRowType.StoreProduct => "Mağaza ve ürün satırları",
+        _ => string.Empty
+    };
+
+    private static string RowTitle(ReportRowEntity row) => row.RowType switch
+    {
+        ReportRowType.General => "Genel toplam",
+        ReportRowType.CategorySummary => row.CategoryName ?? "İsimsiz kategori",
+        ReportRowType.StoreSummary => row.StoreName ?? "İsimsiz mağaza",
+        ReportRowType.StoreCategory => $"{row.StoreName ?? "İsimsiz mağaza"} · {row.CategoryName ?? "İsimsiz kategori"}",
+        ReportRowType.ProductSummary => row.StockName ?? "İsimsiz ürün",
+        ReportRowType.StoreProduct => $"{row.StoreName ?? "İsimsiz mağaza"} · {row.StockName ?? "İsimsiz ürün"}",
         _ => "–"
     };
 
-    private static string? RowCode(ReportTreeRow row) => row.Level switch
+    private static string? RowCode(ReportRowEntity row) => row.RowType switch
     {
-        ReportTreeLevel.Category => row.Data.CategoryCode,
-        ReportTreeLevel.Product => row.Data.StockCode,
-        ReportTreeLevel.Store => row.Data.StoreNumber?.ToString(),
+        ReportRowType.CategorySummary => row.CategoryCode,
+        ReportRowType.StoreSummary => row.StoreNumber?.ToString(),
+        ReportRowType.StoreCategory => $"{row.StoreNumber} · {row.CategoryCode}",
+        ReportRowType.ProductSummary => row.StockCode,
+        ReportRowType.StoreProduct => $"{row.StoreNumber} · {row.StockCode}",
         _ => null
     };
 
-    private static string? RowClass(ReportTreeLevel level) => level switch
-    {
-        ReportTreeLevel.General => "has-background-primary-light",
-        ReportTreeLevel.Category => "has-background-info-light",
-        _ => null
-    };
+    private static bool CanCreateExcuse(ReportRowEntity row) => row.RowType is
+        ReportRowType.StoreCategory or ReportRowType.StoreProduct;
 
     private sealed class ObjectValueComparer : IComparer<object?>
     {

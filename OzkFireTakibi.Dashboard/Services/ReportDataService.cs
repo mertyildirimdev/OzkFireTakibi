@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using OzkFireTakibi.Dashboard.Data;
 using OzkFireTakibi.Dashboard.Models;
+using OzkFireTakibi.Dashboard.Data;
+using OzkFireTakibi.Dashboard.Data.Entities;
 
 namespace OzkFireTakibi.Dashboard.Services;
 
-public sealed class ReportDataService(IDbContextFactory<ReportDbContext> dbContextFactory, IMemoryCache memoryCache)
+public sealed class ReportDataService(IDbContextFactory<AppDbContext> dbContextFactory, IMemoryCache memoryCache)
 {
     public async Task<IReadOnlyList<ReportPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default)
     {
@@ -40,9 +41,8 @@ public sealed class ReportDataService(IDbContextFactory<ReportDbContext> dbConte
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var importItem = await dbContext.ReportImports.AsNoTracking().SingleAsync(x => x.Id == importId, cancellationToken);
-        var includedTypes = new[] { ReportRowType.General, ReportRowType.CategorySummary, ReportRowType.ProductSummary, ReportRowType.StoreProduct };
         var rows = await dbContext.ReportRows.AsNoTracking()
-            .Where(x => x.ReportImportId == importId && includedTypes.Contains(x.RowType))
+            .Where(x => x.ReportImportId == importId)
             .OrderBy(x => x.SourceRowNumber)
             .ToArrayAsync(cancellationToken);
 
@@ -58,13 +58,14 @@ public sealed class ReportDataService(IDbContextFactory<ReportDbContext> dbConte
         var snapshot = new ReportSnapshot
         {
             Import = ToOption(importItem)!,
+            Rows = rows,
             General = general,
             Categories = categories,
             ProductsByCategory = products
                 .GroupBy(product => categoryByStock.GetValueOrDefault(ReportSnapshot.StockKey(product), "(kategori-yok)"), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(x => x.Key, x => (IReadOnlyList<ReportRowRecord>)x.ToArray(), StringComparer.OrdinalIgnoreCase),
+                .ToDictionary(x => x.Key, x => (IReadOnlyList<ReportRowEntity>)x.ToArray(), StringComparer.OrdinalIgnoreCase),
             StoresByProduct = stores.GroupBy(ReportSnapshot.ProductKey)
-                .ToDictionary(x => x.Key, x => (IReadOnlyList<ReportRowRecord>)x.ToArray(), StringComparer.OrdinalIgnoreCase),
+                .ToDictionary(x => x.Key, x => (IReadOnlyList<ReportRowEntity>)x.ToArray(), StringComparer.OrdinalIgnoreCase),
             StoreProducts = stores
         };
 
@@ -72,7 +73,7 @@ public sealed class ReportDataService(IDbContextFactory<ReportDbContext> dbConte
         return snapshot;
     }
 
-    private static ReportImportOption? ToOption(ReportImportRecord? item) => item is null
+    private static ReportImportOption? ToOption(ReportImportEntity? item) => item is null
         ? null
         : new(item.Id, item.PeriodType, item.StartDate, item.EndDate, item.OriginalFileName);
 }
