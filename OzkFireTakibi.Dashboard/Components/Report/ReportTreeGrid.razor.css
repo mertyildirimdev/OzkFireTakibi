@@ -22,7 +22,6 @@ thead th {
 }
 
 .group-toggle-all {
-    color: var(--bulma-text);
     height: 1.75rem;
     min-width: 1.75rem;
     padding: 0;
@@ -37,9 +36,6 @@ tbody td:first-child {
 
 .group-row th {
     padding: 0;
-    position: sticky;
-    top: 2.5rem;
-    z-index: 2;
 }
 
 .group-row .button {

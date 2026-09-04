@@ -3,16 +3,16 @@
         <thead>
             <tr>
                 <th class="breakdown-column">
-                    <div class="is-flex is-align-items-center is-justify-content-space-between">
+                    <div class="is-flex is-align-items-center">
                         <span>Kırılım</span>
-                        <button class="button is-small is-ghost group-toggle-all"
+                        <button class="button is-small is-info is-light is-rounded group-toggle-all ml-2"
                                 type="button"
                                 title="@(AreAllGroupsExpanded ? "Tüm grupları kapat" : "Tüm grupları aç")"
                                 aria-label="@(AreAllGroupsExpanded ? "Tüm grupları kapat" : "Tüm grupları aç")"
                                 aria-expanded="@(AreAllGroupsExpanded ? "true" : "false")"
                                 @onclick="ToggleAll">
                             <span class="icon is-small">
-                                <i class="fas @(AreAllGroupsExpanded ? "fa-minus-square" : "fa-plus-square")"></i>
+                                <i class="fas @(AreAllGroupsExpanded ? "fa-compress-alt" : "fa-expand-alt")"></i>
                             </span>
                         </button>
                     </div>
