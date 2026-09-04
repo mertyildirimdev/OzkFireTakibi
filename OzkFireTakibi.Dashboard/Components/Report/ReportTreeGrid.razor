@@ -73,8 +73,13 @@
                             </td>
                             @foreach (var column in Columns)
                             {
+                                var comparison = FormatComparison(column, row);
                                 <td class="@(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
-                                    @column.Format(row)
+                                    <span>@column.Format(row)</span>
+                                    @if (comparison is not null)
+                                    {
+                                        <span class="is-size-7 has-text-grey ml-1">(@comparison)</span>
+                                    }
                                 </td>
                             }
                             @if (CanRequestExcuse)
@@ -126,6 +131,7 @@
     ];
 
     private HashSet<ReportRowType> _expandedGroups = new(GroupOrder);
+    private ReportComparisonIndex? _comparisonIndex;
     private long _snapshotImportId;
     private int ColumnCount => Columns.Count + (CanRequestExcuse ? 2 : 1);
     private bool HasActiveFiltering => !string.IsNullOrWhiteSpace(GlobalSearch) || Filters.Count > 0;
@@ -134,10 +140,11 @@
 
     protected override void OnParametersSet()
     {
-        if (_snapshotImportId != Snapshot.Import.Id)
+        if (_snapshotImportId != Snapshot.Import.Id || _comparisonIndex is null)
         {
             _snapshotImportId = Snapshot.Import.Id;
             _expandedGroups = new HashSet<ReportRowType>(GroupOrder);
+            _comparisonIndex = new ReportComparisonIndex(Snapshot);
         }
     }
 
@@ -263,6 +270,17 @@
 
     private static bool CanCreateExcuse(ReportRowEntity row) => row.RowType is
         ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+
+    private string? FormatComparison(ColumnDefinition column, ReportRowEntity row)
+    {
+        if (_comparisonIndex?.FindFor(row, column.ComparisonScope) is not { } comparisonRow)
+        {
+            return null;
+        }
+
+        var comparisonValue = column.ValueForComparison(comparisonRow);
+        return comparisonValue is null ? null : column.FormatValue(comparisonValue);
+    }
 
     private sealed class ObjectValueComparer : IComparer<object?>
     {

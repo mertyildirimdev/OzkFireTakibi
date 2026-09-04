@@ -27,13 +27,16 @@ public sealed class ReportSnapshot
 }
 
 public enum ColumnDataType { Text, Number, Percentage }
+public enum ColumnComparisonScope { None, Summary, Category }
 
 public sealed record ColumnDefinition(
     string Key,
     string Label,
     ColumnDataType DataType,
     Func<ReportRowEntity, object?> Value,
-    bool IsDefault = false)
+    bool IsDefault = false,
+    ColumnComparisonScope ComparisonScope = ColumnComparisonScope.None,
+    Func<ReportRowEntity, object?>? ComparisonValue = null)
 {
     public string ValueKey(ReportRowEntity row)
     {
@@ -47,9 +50,11 @@ public sealed record ColumnDefinition(
         };
     }
 
-    public string Format(ReportRowEntity row)
+    public string Format(ReportRowEntity row) => FormatValue(Value(row));
+    public object? ValueForComparison(ReportRowEntity row) => (ComparisonValue ?? Value)(row);
+
+    public string FormatValue(object? value)
     {
-        var value = Value(row);
         return value switch
         {
             null => "–",
@@ -79,27 +84,49 @@ public static class ReportColumnCatalog
         new("alternativeName", "Alternatif İsim", ColumnDataType.Text, row => row.AlternativeName),
         new("costGroupType", "Maliyet Grup Tipi", ColumnDataType.Text, row => row.CostGroupType),
         new("costGroupCode", "Maliyet Grup Kodu", ColumnDataType.Text, row => row.CostGroupCode),
-        new("purchaseGroupValueFactor", "Satın Alma Grubu Değer Çarpanı", ColumnDataType.Number, row => row.PurchaseGroupValueFactor),
-        new("purchaseStockValueFactor", "Satın Alma Stok Değer Çarpanı", ColumnDataType.Number, row => row.PurchaseStockValueFactor),
-        new("openingQuantity", "Dönem Başı Miktar", ColumnDataType.Number, row => row.OpeningQuantity),
-        new("openingAmount", "Dönem Başı Tutar", ColumnDataType.Number, row => row.OpeningAmount),
-        new("companyPurchaseQuantity", "Firma Alış Miktar", ColumnDataType.Number, row => row.CompanyPurchaseQuantity),
-        new("companyPurchaseAmount", "Firma Alış Tutar", ColumnDataType.Number, row => row.CompanyPurchaseAmount),
-        new("warehouseTransferInQuantity", "Depo Sevk Alış Miktar", ColumnDataType.Number, row => row.WarehouseTransferInQuantity),
-        new("warehouseTransferInAmount", "Depo Sevk Alış Tutar", ColumnDataType.Number, row => row.WarehouseTransferInAmount),
-        new("warehouseTransferOutQuantity", "Depo Sevk Satış Miktar", ColumnDataType.Number, row => row.WarehouseTransferOutQuantity),
-        new("warehouseTransferOutAmount", "Depo Sevk Satış Tutar", ColumnDataType.Number, row => row.WarehouseTransferOutAmount),
-        new("storeSalesQuantity", "Mağaza Satış Miktar", ColumnDataType.Number, row => row.StoreSalesQuantity),
-        new("storeSalesAmount", "Mağaza Satış Tutar", ColumnDataType.Number, row => row.StoreSalesAmount, true),
-        new("costOfSales", "Satış Maliyeti", ColumnDataType.Number, row => row.CostOfSales, true),
-        new("wasteRate", "Fire Oranı", ColumnDataType.Percentage, row => row.WasteRate, true),
-        new("wasteQuantity", "Fire Miktarı", ColumnDataType.Number, row => row.WasteQuantity),
-        new("wasteAmount", "Fire Tutarı", ColumnDataType.Number, row => row.WasteAmount, true),
-        new("closingQuantity", "Dönem Sonu Miktar", ColumnDataType.Number, row => row.ClosingQuantity),
-        new("closingAmount", "Dönem Sonu Tutar", ColumnDataType.Number, row => row.ClosingAmount),
-        new("profitAmount", "Kar Tutar", ColumnDataType.Number, row => row.ProfitAmount, true),
-        new("profitRate", "Kar Oranı", ColumnDataType.Percentage, row => row.ProfitRate, true),
-        new("categoryProfitRate", "Kategori Kar Oranı", ColumnDataType.Percentage, row => row.CategoryProfitRate),
-        new("categoryWasteRate", "Kategori Fire Oranı", ColumnDataType.Percentage, row => row.CategoryWasteRate)
+        Metric("purchaseGroupValueFactor", "Satın Alma Grubu Değer Çarpanı", ColumnDataType.Number, row => row.PurchaseGroupValueFactor),
+        Metric("purchaseStockValueFactor", "Satın Alma Stok Değer Çarpanı", ColumnDataType.Number, row => row.PurchaseStockValueFactor),
+        Metric("openingQuantity", "Dönem Başı Miktar", ColumnDataType.Number, row => row.OpeningQuantity),
+        Metric("openingAmount", "Dönem Başı Tutar", ColumnDataType.Number, row => row.OpeningAmount),
+        Metric("companyPurchaseQuantity", "Firma Alış Miktar", ColumnDataType.Number, row => row.CompanyPurchaseQuantity),
+        Metric("companyPurchaseAmount", "Firma Alış Tutar", ColumnDataType.Number, row => row.CompanyPurchaseAmount),
+        Metric("warehouseTransferInQuantity", "Depo Sevk Alış Miktar", ColumnDataType.Number, row => row.WarehouseTransferInQuantity),
+        Metric("warehouseTransferInAmount", "Depo Sevk Alış Tutar", ColumnDataType.Number, row => row.WarehouseTransferInAmount),
+        Metric("warehouseTransferOutQuantity", "Depo Sevk Satış Miktar", ColumnDataType.Number, row => row.WarehouseTransferOutQuantity),
+        Metric("warehouseTransferOutAmount", "Depo Sevk Satış Tutar", ColumnDataType.Number, row => row.WarehouseTransferOutAmount),
+        Metric("storeSalesQuantity", "Mağaza Satış Miktar", ColumnDataType.Number, row => row.StoreSalesQuantity),
+        Metric("storeSalesAmount", "Mağaza Satış Tutar", ColumnDataType.Number, row => row.StoreSalesAmount, true),
+        Metric("costOfSales", "Satış Maliyeti", ColumnDataType.Number, row => row.CostOfSales, true),
+        Metric("wasteRate", "Fire Oranı", ColumnDataType.Percentage, row => row.WasteRate, true),
+        Metric("wasteQuantity", "Fire Miktarı", ColumnDataType.Number, row => row.WasteQuantity),
+        Metric("wasteAmount", "Fire Tutarı", ColumnDataType.Number, row => row.WasteAmount, true),
+        Metric("closingQuantity", "Dönem Sonu Miktar", ColumnDataType.Number, row => row.ClosingQuantity),
+        Metric("closingAmount", "Dönem Sonu Tutar", ColumnDataType.Number, row => row.ClosingAmount),
+        Metric("profitAmount", "Kar Tutar", ColumnDataType.Number, row => row.ProfitAmount, true),
+        Metric("profitRate", "Kar Oranı", ColumnDataType.Percentage, row => row.ProfitRate, true),
+        Metric(
+            "categoryProfitRate",
+            "Kategori Kar Oranı",
+            ColumnDataType.Percentage,
+            row => row.CategoryProfitRate,
+            comparisonScope: ColumnComparisonScope.Category,
+            comparisonValue: row => row.ProfitRate),
+        Metric(
+            "categoryWasteRate",
+            "Kategori Fire Oranı",
+            ColumnDataType.Percentage,
+            row => row.CategoryWasteRate,
+            comparisonScope: ColumnComparisonScope.Category,
+            comparisonValue: row => row.WasteRate)
     ];
+
+    private static ColumnDefinition Metric(
+        string key,
+        string label,
+        ColumnDataType dataType,
+        Func<ReportRowEntity, object?> value,
+        bool isDefault = false,
+        ColumnComparisonScope comparisonScope = ColumnComparisonScope.Summary,
+        Func<ReportRowEntity, object?>? comparisonValue = null)
+        => new(key, label, dataType, value, isDefault, comparisonScope, comparisonValue);
 }
