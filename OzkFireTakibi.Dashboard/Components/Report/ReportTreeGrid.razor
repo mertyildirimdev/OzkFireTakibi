@@ -58,7 +58,7 @@
 
                 @if (isExpanded)
                 {
-                    @foreach (var row in SortRows(rows))
+                    @foreach (var row in SortRows(rows).Skip((Page(group) - 1) * PageSize).Take(PageSize))
                     {
                         <tr>
                             <td>
@@ -96,6 +96,16 @@
                         </tr>
                     }
                 }
+                    @if (isExpanded && rows.Count > PageSize)
+                    {
+                        <tr><td colspan="@ColumnCount">
+                            <nav class="pagination is-small" aria-label="@($"{GroupTitle(group)} sayfaları")">
+                                <button class="pagination-previous" disabled="@(Page(group) <= 1)" @onclick="() => SetPage(group, Page(group) - 1)">Önceki</button>
+                                <button class="pagination-next" disabled="@(Page(group) * PageSize >= rows.Count)" @onclick="() => SetPage(group, Page(group) + 1)">Sonraki</button>
+                                <span class="pagination-list">@rows.Count satır · Sayfa @Page(group) / @((rows.Count + PageSize - 1) / PageSize)</span>
+                            </nav>
+                        </td></tr>
+                    }
             }
         </tbody>
     </table>
@@ -104,7 +114,7 @@
 <div class="is-flex is-justify-content-space-between is-align-items-center mt-3">
     <p class="is-size-7 has-text-grey">
         <strong>@FilteredRowCount.ToString("N0")</strong> Excel satırı eşleşiyor.
-        Ana kırılımlar Excel sırasındadır ve birbirinden bağımsız açılıp kapatılabilir.
+        Kırılımlar bağımsız açılır; her sayfada en fazla @PageSize satır gösterilir. Arama ve filtreler tüm satırlarda çalışır.
     </p>
 </div>
 
@@ -130,7 +140,12 @@
         ReportRowType.StoreProduct
     ];
 
-    private HashSet<ReportRowType> _expandedGroups = new(GroupOrder);
+    private HashSet<ReportRowType> _expandedGroups = [ReportRowType.General, ReportRowType.StoreSummary];
+    private const int PageSize = 50;
+    private readonly Dictionary<ReportRowType, int> _pages = [];
+    private string? _filterSignature;
+    private int Page(ReportRowType group) => _pages.GetValueOrDefault(group, 1);
+    private void SetPage(ReportRowType group, int page) => _pages[group] = Math.Max(1, page);
     private ReportComparisonIndex? _comparisonIndex;
     private long _snapshotImportId;
     private int ColumnCount => Columns.Count + (CanRequestExcuse ? 2 : 1);
@@ -143,8 +158,20 @@
         if (_snapshotImportId != Snapshot.Import.Id || _comparisonIndex is null)
         {
             _snapshotImportId = Snapshot.Import.Id;
-            _expandedGroups = new HashSet<ReportRowType>(GroupOrder);
+            _expandedGroups = [ReportRowType.General, ReportRowType.StoreSummary];
+            _pages.Clear();
             _comparisonIndex = new ReportComparisonIndex(Snapshot);
+        }
+        var signature = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            GlobalSearch, Sort,
+            Filters = Filters.OrderBy(x => x.Key).Select(x => new { x.Key, Values = x.Value.Order().ToArray() }).ToArray()
+        });
+        if (_filterSignature != signature)
+        {
+            _filterSignature = signature;
+            _pages.Clear();
+            if (HasActiveFiltering) _expandedGroups = new HashSet<ReportRowType>(GroupOrder);
         }
     }
 
@@ -273,6 +300,7 @@
 
     private string? FormatComparison(ColumnDefinition column, ReportRowEntity row)
     {
+        if (Snapshot.IsStoreScoped) return null;
         if (_comparisonIndex?.FindFor(row, column.ComparisonScope) is not { } comparisonRow)
         {
             return null;

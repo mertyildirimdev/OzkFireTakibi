@@ -25,9 +25,18 @@
         </div>
     </div>
 
+    @if (selectedMonth.HasValue)
+    {
+        <div class="notification is-info is-light"><strong>@selectedMonth.Value.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))</strong> ayının tüm rapor gruplarındaki mazeretler gösteriliyor. <a href="/mazeretler">Tüm dönemleri göster</a></div>
+    }
+    else if (PeriodId.HasValue)
+    {
+        <div class="notification is-info is-light">Ana sayfadan seçilen dönemin mazeretleri gösteriliyor. <a href="/mazeretler">Tüm dönemleri göster</a></div>
+    }
     @if (errorMessage is not null)
     {
         <div class="notification is-danger is-light">@errorMessage</div>
+        <button class="button" @onclick="ApplyFiltersAsync">Tekrar dene</button>
     }
     else if (isLoading)
     {
@@ -39,7 +48,7 @@
             @foreach (var metric in Metrics)
             {
                 <div class="column is-half-tablet is-one-quarter-desktop">
-                    <button class="box has-text-left is-fullwidth" type="button" @onclick="() => selectedStatus = metric.Value">
+                    <button class="box has-text-left is-fullwidth" type="button" @onclick="() => SetStatusAsync(metric.Value)">
                         <p class="heading">@metric.Label</p><p class="title is-4">@metric.Count</p>
                     </button>
                 </div>
@@ -51,16 +60,16 @@
                 <div class="column is-two-thirds">
                     <label class="label is-small" for="excuse-search">Ara</label>
                     <div class="control has-icons-left">
-                        <input id="excuse-search" class="input" type="search" placeholder="Mağaza, kategori, ürün veya rapor" @bind="searchText" @bind:event="oninput" />
+                        <input id="excuse-search" class="input" type="search" placeholder="Mağaza, kategori, ürün veya rapor" @bind="searchText" />
                         <span class="icon is-left"><i class="fas fa-magnifying-glass"></i></span>
                     </div>
                 </div>
                 <div class="column">
                     <label class="label is-small" for="excuse-status">Durum</label>
                     <div class="select is-fullwidth">
-                        <select id="excuse-status" @bind="selectedStatus">
+                        <select id="excuse-status" @bind="selectedStatus" @bind:after="ApplyFiltersAsync">
                             <option value="">Tüm aktif durumlar</option>
-                            @foreach (var status in Enum.GetValues<ExcuseStatus>().Where(x => x != ExcuseStatus.Superseded))
+                            @foreach (var status in Enum.GetValues<ExcuseStatus>())
                             {
                                 <option value="@status.ToString()">@ExcuseDisplayNames.Status(status)</option>
                             }
@@ -68,16 +77,18 @@
                     </div>
                 </div>
             </div>
+            <button class="button is-primary" type="button" @onclick="ApplyFiltersAsync">Ara</button>
+            <span class="is-size-7 has-text-grey ml-3">Sayaçlar @(PeriodId.HasValue || selectedMonth.HasValue ? "seçili dönemdeki" : "tüm dönemlerdeki") aktif kayıtları gösterir; aramadan bağımsızdır.</span>
         </div>
 
-        @if (FilteredItems.Count == 0)
+        @if (result.Items.Count == 0)
         {
             <div class="notification is-info is-light">Filtreye uyan mazeret bulunamadı.</div>
         }
         else
         {
             <div>
-                @foreach (var item in FilteredItems)
+                @foreach (var item in result.Items)
                 {
                     <details class="box py-4 mb-3">
                         <summary class="is-clickable">
@@ -99,10 +110,19 @@
                 }
             </div>
         }
+        <nav class="pagination mt-4" role="navigation" aria-label="Mazeret sayfaları">
+            <button class="pagination-previous" disabled="@(result.PageNumber <= 1)" @onclick="() => LoadAsync(result.PageNumber - 1)">Önceki</button>
+            <button class="pagination-next" disabled="@(result.PageNumber >= result.TotalPages)" @onclick="() => LoadAsync(result.PageNumber + 1)">Sonraki</button>
+            <p class="pagination-list">@result.TotalCount kayıt · Sayfa @result.PageNumber / @result.TotalPages</p>
+        </nav>
     }
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "period")] public long? PeriodId { get; set; }
+    [SupplyParameterFromQuery(Name = "month")] public string? Month { get; set; }
+    private DateOnly? selectedMonth;
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private ExcuseListResult? result;
@@ -119,20 +139,45 @@
         ("Onaylandı", result.ApprovedCount, ExcuseStatus.Approved.ToString())
     ];
 
-    private IReadOnlyList<ExcuseListItem> FilteredItems => result?.Items.Where(item =>
-        (string.IsNullOrEmpty(selectedStatus) || item.Status.ToString() == selectedStatus) &&
-        (string.IsNullOrWhiteSpace(searchText) || SearchText(item).Contains(searchText.Trim(), StringComparison.CurrentCultureIgnoreCase)))
-        .ToArray() ?? [];
-
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
         if (currentUser.Identity?.IsAuthenticated != true) return;
-        isLoading = true;
-        try { result = await ExcuseService.GetListAsync(currentUser, null, null, 1, cancellationTokenSource.Token); }
-        catch (Exception exception) { errorMessage = exception.Message; }
-        finally { isLoading = false; }
+        selectedMonth = null;
+        if (!string.IsNullOrWhiteSpace(Month))
+        {
+            if (!DateOnly.TryParseExact(Month, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var month))
+            {
+                errorMessage = "Raporlama ayı geçersiz. Ana sayfadan ayı yeniden seçin.";
+                return;
+            }
+            selectedMonth = month;
+        }
+        selectedStatus = Enum.TryParse<ExcuseStatus>(Status, out var status) ? status.ToString() : string.Empty;
+        await LoadAsync(1);
     }
+
+    private int loadVersion;
+    private async Task LoadAsync(int page)
+    {
+        var version = ++loadVersion;
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            var loaded = await ExcuseService.GetListAsync(currentUser,
+                Enum.TryParse<ExcuseStatus>(selectedStatus, out var status) ? status : null,
+                searchText, page, cancellationTokenSource.Token, PeriodId, selectedMonth);
+            if (version == loadVersion) result = loaded;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { if (version == loadVersion) errorMessage = "Mazeretler yüklenemedi. Sayfayı yenileyerek tekrar deneyin."; }
+        finally { if (version == loadVersion) isLoading = false; }
+    }
+
+    private Task ApplyFiltersAsync() => LoadAsync(1);
+    private Task SetStatusAsync(string value) { selectedStatus = value; return LoadAsync(1); }
 
     private static string SearchText(ExcuseListItem item) => $"{item.StoreName} {item.StoreNumber} {item.TargetName} {item.TargetCode} {item.ReportName}";
     private static string DisplayTarget(ExcuseListItem item) => string.Join(" · ", new[] { item.TargetName, item.TargetCode }.Where(x => !string.IsNullOrWhiteSpace(x)));

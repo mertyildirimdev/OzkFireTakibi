@@ -30,16 +30,28 @@ public sealed class ExcuseService(
         ExcuseStatus? status,
         string? searchText,
         int pageNumber,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        long? periodId = null,
+        DateOnly? month = null)
     {
         user.EnsureAuthenticated("Mazeretleri görüntülemek için oturum açılmalıdır.");
         pageNumber = Math.Max(1, pageNumber);
-        var pageSize = Math.Clamp(_options.PageSize, 10, 10000);
+        var pageSize = Math.Clamp(_options.PageSize, 10, 100);
         var normalizedSearch = searchText?.Trim();
         var access = GetAccess(user);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var accessibleQuery = ApplyReadAccess(dbContext.ExcuseRequests.AsNoTracking(), access);
+        if (periodId.HasValue)
+            accessibleQuery = accessibleQuery.Where(request => request.ReportRow.ReportImport.ReportPeriodId == periodId.Value);
+        if (month.HasValue)
+        {
+            var start = new DateOnly(month.Value.Year, month.Value.Month, 1);
+            var end = start.AddMonths(1);
+            accessibleQuery = accessibleQuery.Where(request => request.ReportRow.ReportImport.EndDate >= start &&
+                request.ReportRow.ReportImport.EndDate < end && request.ReportRow.ReportImport.IsActive &&
+                request.ReportRow.ReportImport.PeriodType == ReportPeriodType.Monthly);
+        }
         // Geçersiz kalan kayıtlar sayaçlara ve varsayılan listeye girmez; açıkça filtrelenirse geçmişten görülebilir.
         var activeQuery = accessibleQuery.Where(request => request.Status != ExcuseStatus.Superseded);
 
@@ -54,8 +66,13 @@ public sealed class ExcuseService(
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
+            var storeNumber = int.TryParse(normalizedSearch, out var parsedStore) ? parsedStore : (int?)null;
             query = query.Where(request =>
                 request.Title.Contains(normalizedSearch) ||
+                (storeNumber.HasValue && request.ReportRow.StoreNumber == storeNumber) ||
+                request.ReportRow.ReportImport.OriginalFileName.Contains(normalizedSearch) ||
+                (request.ReportRow.StockName != null && request.ReportRow.StockName.Contains(normalizedSearch)) ||
+                (request.ReportRow.StockCode != null && request.ReportRow.StockCode.Contains(normalizedSearch)) ||
                 (request.ReportRow.StoreName != null && request.ReportRow.StoreName.Contains(normalizedSearch)) ||
                 (request.ReportRow.CategoryName != null && request.ReportRow.CategoryName.Contains(normalizedSearch)) ||
                 (request.ReportRow.CategoryCode != null && request.ReportRow.CategoryCode.Contains(normalizedSearch)));

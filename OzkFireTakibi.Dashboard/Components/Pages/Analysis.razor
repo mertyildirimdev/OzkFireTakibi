@@ -8,31 +8,51 @@
 {
     <div class="container"><progress class="progress is-primary" max="100">Yükleniyor</progress></div>
 }
+else if (_error is not null)
+{
+    <div class="container"><h1 class="title is-3">Analizler</h1><div class="notification is-danger is-light">@_error</div>
+        <button class="button" @onclick="LoadAsync">Tekrar dene</button></div>
+}
 else if (_periodId is null)
 {
     <div class="container">
         <p class="has-text-primary has-text-weight-semibold mb-2">ANALİZ</p>
         <h1 class="title is-2">Fire ve kârlılık verileri</h1>
-        <div class="notification is-info is-light">Analiz edilecek rapor bulunmuyor. Önce Raporlar sayfasından aylık ve kümülatif Excel dosyalarını yükleyin.</div>
+        <div class="notification is-info is-light">Görüntüleme kapsamınızda aktif rapor bulunmuyor. Mağaza kullanıcısıysanız mağaza eşlemenizi kontrol ettirin.</div>
+        <AuthorizeView Policy="@ReportPolicies.CanImportReports"><Authorized><a class="button is-primary" href="/raporlar">Rapor yükle</a></Authorized></AuthorizeView>
     </div>
 }
 else
 {
-    <ReportWorkspace PeriodId="_periodId.Value" RouteBase="/analizler" />
+    <ReportWorkspace PeriodId="_periodId.Value" RouteBase="/analizler" InitialType="Type" InitialStore="Store" />
 }
 
 @code {
     [Parameter] public long? PeriodId { get; set; }
+    [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    [SupplyParameterFromQuery(Name = "store")] public int? Store { get; set; }
+    private string? _error;
+    private int _loadVersion;
     private long? _periodId;
     private bool _isLoading = true;
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
+        var version = ++_loadVersion;
         _isLoading = true;
-        var periods = await ReportDataService.GetPeriodsAsync();
-        _periodId = PeriodId.HasValue && periods.Any(x => x.Id == PeriodId.Value)
-            ? PeriodId.Value
-            : periods.FirstOrDefault()?.Id;
-        _isLoading = false;
+        _error = null;
+        try
+        {
+            var id = PeriodId;
+            var periods = await ReportDataService.GetPeriodsAsync();
+            if (version != _loadVersion) return;
+            if (id.HasValue && !periods.Any(x => x.Id == id.Value))
+                throw new UnauthorizedAccessException("Seçilen dönem bulunamadı veya bu döneme erişiminiz yok.");
+            _periodId = id ?? periods.FirstOrDefault()?.Id;
+        }
+        catch (Exception ex) { if (version == _loadVersion) _error = ErrorMessageHelper.GetDetailErrorMessage(ex); }
+        finally { if (version == _loadVersion) _isLoading = false; }
     }
 }

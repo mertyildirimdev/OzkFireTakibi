@@ -5,13 +5,15 @@ namespace OzkFireTakibi.Dashboard.Models;
 
 public sealed record ReportImportOption(long Id, ReportPeriodType PeriodType, DateOnly StartDate, DateOnly EndDate, string OriginalFileName);
 
-public sealed record ReportPeriodOption(long Id, DateOnly EndDate, ReportImportOption? Monthly, ReportImportOption? Cumulative)
+public sealed record ReportPeriodOption(long Id, DateOnly EndDate, ReportImportOption? Monthly, ReportImportOption? Cumulative, string CategorySignature = "", string ScopeLabel = "")
 {
-    public string Label => EndDate.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("tr-TR"));
+    public string Label => $"{EndDate.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("tr-TR"))} · {(string.IsNullOrWhiteSpace(ScopeLabel) ? "Kategori kapsamı belirtilmemiş" : ScopeLabel)}";
 }
 
 public sealed class ReportSnapshot
 {
+    public bool IsStoreScoped { get; init; }
+    public decimal? BenchmarkWasteRate { get; init; }
     public required ReportImportOption Import { get; init; }
     public required IReadOnlyList<ReportRowEntity> Rows { get; init; }
     public required ReportRowEntity General { get; init; }
@@ -25,6 +27,8 @@ public sealed class ReportSnapshot
     public static string ProductKey(ReportRowEntity row) => ProductKey(CategoryKey(row), row);
     public static string ProductKey(string categoryKey, ReportRowEntity row) => $"{categoryKey}|{StockKey(row)}";
 }
+
+public sealed record AttentionStore(ReportRowEntity Row, long? RequestId, ExcuseStatus? Status);
 
 public enum ColumnDataType { Text, Number, Percentage }
 public enum ColumnComparisonScope { None, Summary, Category }

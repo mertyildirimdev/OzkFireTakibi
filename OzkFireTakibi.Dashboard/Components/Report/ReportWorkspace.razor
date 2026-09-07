@@ -12,6 +12,7 @@
     else if (!string.IsNullOrWhiteSpace(_errorMessage))
     {
         <div class="notification is-danger is-light">@_errorMessage</div>
+        <button class="button" @onclick="LoadPeriodAsync">Tekrar dene</button>
     }
     else if (_period is not null && _snapshot is not null)
     {
@@ -64,7 +65,7 @@
                 </div>
                 <div class="column">
                     <div class="buttons is-right">
-                        @if (_filters.Count > 0)
+                        @if (_filters.Count > 0 || !string.IsNullOrWhiteSpace(_globalSearch) || _sort is not null)
                         {
                             <button class="button is-light" type="button" @onclick="ClearFilters">
                                 <span class="icon"><i class="fas fa-filter-circle-xmark"></i></span>
@@ -116,6 +117,11 @@
 @code {
     [Parameter] public long PeriodId { get; set; }
     [Parameter] public string RouteBase { get; set; } = "/analizler";
+    [Parameter] public string? InitialType { get; set; }
+    [Parameter] public int? InitialStore { get; set; }
+    private string? _loadedType;
+    private int? _loadedStore;
+    private int _loadVersion;
 
     private IReadOnlyList<ReportPeriodOption> _periods = [];
     private ReportPeriodOption? _period;
@@ -146,47 +152,64 @@
     {
         _currentUser = (await StateProvider.GetAuthenticationStateAsync()).User;
         _canRequestExcuse = (await AuthorizationService.AuthorizeAsync(_currentUser, ReportPolicies.CanRequestExcuses)).Succeeded;
-        if (_loadedPeriodId == PeriodId && _snapshot is not null) return;
+        if (_loadedPeriodId == PeriodId && _snapshot is not null && _loadedType == InitialType && _loadedStore == InitialStore) return;
         await LoadPeriodAsync();
     }
 
     private async Task LoadPeriodAsync()
     {
+        var version = ++_loadVersion;
+        var requestedPeriod = PeriodId;
+        var requestedType = InitialType;
+        var requestedStore = InitialStore;
         _isLoading = true;
         _errorMessage = null;
         try
         {
-            _periods = await ReportDataService.GetPeriodsAsync();
-            _period = _periods.FirstOrDefault(x => x.Id == PeriodId) ?? _periods.FirstOrDefault();
+            var periods = await ReportDataService.GetPeriodsAsync();
+            if (version != _loadVersion) return;
+            _periods = periods;
+            _period = _periods.FirstOrDefault(x => x.Id == requestedPeriod);
             if (_period is null) throw new InvalidOperationException("Görüntülenecek aktif rapor bulunamadı.");
             _loadedPeriodId = _period.Id;
             _selectedType = _period.Monthly is not null ? ReportPeriodType.Monthly : ReportPeriodType.Cumulative;
-            await LoadSnapshotAsync();
+            if (Enum.TryParse<ReportPeriodType>(requestedType, out var type) && Enum.IsDefined(type)) _selectedType = type;
+            _filters.Clear();
+            _sort = null;
+            _globalSearch = string.Empty;
+            if (requestedStore.HasValue)
+                _filters["storeNumber"] = new HashSet<string> { requestedStore.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+            _loadedType = requestedType;
+            _loadedStore = requestedStore;
+            await LoadSnapshotAsync(version);
         }
         catch (Exception exception)
         {
-            _errorMessage = $"Rapor verileri yüklenemedi: {exception.Message}";
+            if (version == _loadVersion) _errorMessage = ErrorMessageHelper.GetDetailErrorMessage(exception);
         }
         finally
         {
-            _isLoading = false;
+            if (version == _loadVersion) _isLoading = false;
         }
     }
 
     private async Task SelectPeriodTypeAsync(ReportPeriodType type)
     {
+        var version = ++_loadVersion;
         _selectedType = type;
         _isLoading = true;
-        try { await LoadSnapshotAsync(); }
-        catch (Exception exception) { _errorMessage = $"Rapor verileri yüklenemedi: {exception.Message}"; }
-        finally { _isLoading = false; }
+        _errorMessage = null;
+        try { await LoadSnapshotAsync(version); }
+        catch (Exception exception) { if (version == _loadVersion) _errorMessage = ErrorMessageHelper.GetDetailErrorMessage(exception); }
+        finally { if (version == _loadVersion) _isLoading = false; }
     }
 
-    private async Task LoadSnapshotAsync()
+    private async Task LoadSnapshotAsync(int version)
     {
         var importItem = _selectedType == ReportPeriodType.Monthly ? _period?.Monthly : _period?.Cumulative;
         if (importItem is null) throw new InvalidOperationException("Seçilen rapor türü bu dönemde bulunmuyor.");
-        _snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
+        var snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
+        if (version == _loadVersion) _snapshot = snapshot;
     }
 
     private void ChangePeriod(ChangeEventArgs args)
@@ -206,6 +229,7 @@
     {
         _filters.Clear();
         _sort = null;
+        _globalSearch = string.Empty;
     }
 
     private void ApplyFields(IReadOnlySet<string> keys)

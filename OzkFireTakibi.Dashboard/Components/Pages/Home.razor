@@ -1,149 +1,268 @@
 @page "/"
+@using System.Globalization
 @inject ReportDataService ReportDataService
+@inject ExcuseService ExcuseService
+@inject AuthenticationStateProvider StateProvider
+@inject IOptions<OzkFireTakibi.Dashboard.Options.ExcuseOptions> ExcuseOptions
+@implements IDisposable
 
-<PageTitle>ÖZK Fire Takibi Dashboard</PageTitle>
+<PageTitle>Genel görünüm | ÖZK Fire Takibi</PageTitle>
 
 <div class="container">
-    <div class="mb-5">
-        <p class="has-text-primary has-text-weight-semibold mb-2">YÖNETİM ÖZETİ</p>
-        <h1 class="title is-2 mb-2">Fire ve kârlılık görünümü</h1>
-        <p class="subtitle is-6 has-text-grey">Son rapor dönemindeki temel sonuçlar ve dikkat edilmesi gereken kategoriler.</p>
+    <div class="level mb-5">
+        <div class="level-left">
+            <div>
+                <h1 class="title is-3 mb-2">Fire takibi · genel görünüm</h1>
+                <p class="has-text-grey">Aynı ayın rapor grupları, öncelikli mağazalar ve bekleyen işler.</p>
+            </div>
+        </div>
+        @if (_months.Count > 0)
+        {
+            <div class="level-right">
+                <div class="field">
+                    <label class="label is-small" for="overview-month">Raporlama ayı</label>
+                    <div class="select">
+                        <select id="overview-month" value="@MonthKey" @onchange="ChangeMonthAsync" disabled="@_loading">
+                            @foreach (var month in _months)
+                            {
+                                <option value="@month.ToString("yyyy-MM", CultureInfo.InvariantCulture)">@month.ToString("MMMM yyyy", Tr)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
-    @if (_isLoading)
+    @if (_loading)
     {
         <progress class="progress is-primary" max="100">Yükleniyor</progress>
     }
-    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    else if (_error is not null)
     {
-        <div class="notification is-danger is-light">@_errorMessage</div>
+        <div class="notification is-danger is-light" role="alert">@_error</div>
+        <button class="button" @onclick="InitializeAsync">Tekrar dene</button>
     }
-    else if (_period is null)
+    else if (_overview is null)
     {
-        <div class="notification is-info is-light">
-            <div class="is-flex is-align-items-center">
-                <span class="icon is-large mr-3" aria-hidden="true"><i class="fas fa-file-excel fa-xl"></i></span>
-                <div>
-                    <p class="has-text-weight-semibold">Henüz rapor yüklenmedi</p>
-                    <p>Yeni Excel dosyaları yüklendiğinde yönetim özeti burada otomatik olarak oluşacak.</p>
-                </div>
-            </div>
-        </div>
+        <div class="notification is-info is-light">Görüntüleyebileceğiniz aktif rapor bulunmuyor. Mağaza kullanıcısıysanız mağaza eşlemenizin yapılmış olması gerekir.</div>
+        <AuthorizeView Policy="@ReportPolicies.CanImportReports">
+            <Authorized><a class="button is-primary" href="/raporlar">Rapor yükle</a></Authorized>
+        </AuthorizeView>
     }
-    else if (_period is not null && _snapshot is not null)
+    else
     {
-        <div class="level mb-5">
-            <div class="level-left">
-                <div>
-                    <p class="heading">Rapor dönemi</p>
-                    <p class="title is-5">@_period.Label</p>
-                </div>
-            </div>
-            <div class="level-right">
-                <NavLink class="button is-primary" href="@($"/analizler/{_period.Id}")">
-                    <span>Detaylı raporu aç</span>
-                    <span class="icon"><i class="fas fa-arrow-right"></i></span>
-                </NavLink>
-            </div>
-        </div>
-
+        <p class="mb-4">
+            <strong>@(_overview.IsStoreScoped ? "Mağazamın tüm rapor grupları" : "Tüm rapor grupları")</strong>
+            · @_month.ToString("dd.MM.yyyy") – @_month.AddMonths(1).AddDays(-1).ToString("dd.MM.yyyy")
+        </p>
         <div class="columns is-multiline">
             <div class="column is-half-tablet is-one-quarter-desktop">
-                <div class="box">
-                    <p class="heading">Mağaza satış tutarı</p>
-                    <p class="title is-4">@FormatNumber(_snapshot.General.StoreSalesAmount)</p>
-                </div>
+                <div class="box"><p class="heading">Aylık raporu gelen grup</p><p class="title is-3">@_overview.ReceivedCount / @_overview.Groups.Count</p><p class="is-size-7">Bu aya kadar bilinen kapsamlar</p></div>
             </div>
             <div class="column is-half-tablet is-one-quarter-desktop">
-                <div class="box">
-                    <p class="heading">Fire tutarı</p>
-                    <p class="title is-4 has-text-danger">@FormatNumber(_snapshot.General.WasteAmount)</p>
-                    <p class="is-size-7 has-text-grey">@FormatRate(_snapshot.General.WasteRate)</p>
-                </div>
+                <a class="box" href="#report-groups"><p class="heading">Aylık raporu eksik grup</p><p class="title is-3 @(_overview.MissingCount > 0 ? "has-text-warning" : "")">@_overview.MissingCount</p><p class="is-size-7">Eksik kapsamları incele</p></a>
             </div>
             <div class="column is-half-tablet is-one-quarter-desktop">
-                <div class="box">
-                    <p class="heading">Kâr tutarı</p>
-                    <p class="title is-4 has-text-success">@FormatNumber(_snapshot.General.ProfitAmount)</p>
-                    <p class="is-size-7 has-text-grey">@FormatRate(_snapshot.General.ProfitRate)</p>
-                </div>
+                <a class="box" href="#priority-stores"><p class="heading">Eşiğe ulaşan / aşan mağaza</p><p class="title is-3">@_overview.Stores.Count</p><p class="is-size-7">Her mağaza yalnızca bir kez sayılır</p></a>
             </div>
             <div class="column is-half-tablet is-one-quarter-desktop">
-                <div class="box">
-                    <p class="heading">Detay satırı</p>
-                    <p class="title is-4">@_snapshot.StoreProducts.Count.ToString("N0")</p>
-                    <p class="is-size-7 has-text-grey">Mağaza × ürün</p>
-                </div>
+                <a class="box" href="#pending-work"><p class="heading">@(_overview.IsStoreScoped ? "Yanıt / revizyon bekleyen" : "Değerlendirme bekleyen")</p><p class="title is-3">@PendingCount</p><p class="is-size-7">Seçili ayın tüm grupları</p></a>
             </div>
         </div>
 
-        <div class="columns mt-2">
-            <div class="column is-two-thirds">
-                <div class="box">
-                    <div class="level mb-4">
-                        <div class="level-left"><h2 class="title is-5 mb-0">En yüksek fire tutarı olan kategoriler</h2></div>
-                        <div class="level-right"><span class="tag is-danger is-light">İlk 5</span></div>
-                    </div>
-                    <div class="table-container">
-                        <table class="table is-fullwidth is-hoverable">
-                            <thead>
-                                <tr><th>Kategori</th><th class="has-text-right">Fire oranı</th><th class="has-text-right">Fire tutarı</th></tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var category in _snapshot.Categories.OrderBy(row => row.WasteAmount).Take(5))
-                                {
-                                    <tr>
-                                        <td><strong>@category.CategoryName</strong><br /><span class="is-size-7 has-text-grey">@category.CategoryCode</span></td>
-                                        <td class="has-text-right">@FormatRate(category.WasteRate)</td>
-                                        <td class="has-text-right has-text-danger">@FormatNumber(category.WasteAmount)</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <section id="report-groups" class="box">
+            <h2 class="title is-5">Rapor grupları</h2>
+            <p class="mb-3">
+                @if (_overview.ComparableCount > 0)
+                {
+                    <span>Önceki ayla karşılaştırılabilen @_overview.ComparableCount grubun <strong class="has-text-success">@_overview.ImprovedCount tanesinde fire oranı azaldı</strong>, <strong class="has-text-danger">@_overview.WorsenedCount tanesinde arttı</strong>.</span>
+                }
+                else
+                {
+                    <span class="has-text-grey">Aynı kapsamda karşılaştırılabilir önceki ay verisi bulunmuyor.</span>
+                }
+            </p>
+            <p class="is-size-7 has-text-grey mb-4">Yalnızca seçili ayın aylık verileri gösterilir. Kapsamlar geçmiş yüklemelerden belirlenir; çakışabilecek kapsamların tutarları toplanmaz, oranların ortalaması alınmaz.</p>
+            <div class="table-container">
+                <table class="table is-fullwidth is-hoverable">
+                    <thead><tr><th>Rapor grubu / durum</th><th class="has-text-right">Satış</th><th class="has-text-right">Fire tutarı</th><th class="has-text-right">Fire oranı</th><th>Önceki aya göre</th><th class="has-text-right">Kâr oranı</th><th class="has-text-right">Eşikteki mağaza</th><th>İncele</th></tr></thead>
+                    <tbody>
+                        @foreach (var group in _overview.Groups)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@group.Label</strong>
+                                    @if (group.Period?.Monthly is null)
+                                    {
+                                        <p class="mt-1"><span class="tag is-warning is-light">Aylık rapor bekleniyor</span></p>
+                                        @if (group.Period?.Cumulative is not null) { <p class="is-size-7 has-text-grey">Yalnızca kümülatif rapor var</p> }
+                                    }
+                                    else if (group.Summary is null)
+                                    {
+                                        <p class="has-text-danger is-size-7">Rapor özeti bulunamadı</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="is-size-7 has-text-grey">@group.Period.Monthly.StartDate.ToString("dd.MM.yyyy") – @group.Period.Monthly.EndDate.ToString("dd.MM.yyyy")</p>
+                                    }
+                                </td>
+                                <td class="has-text-right">@Money(group.Summary?.StoreSalesAmount)</td>
+                                <td class="has-text-right">@Money(group.Summary?.WasteAmount)</td>
+                                <td class="has-text-right">@Rate(group.Summary?.WasteRate)</td>
+                                <td class="is-size-7 @ChangeColor(group)">@RateChange(group)</td>
+                                <td class="has-text-right @ProfitColor(group.Summary?.ProfitRate)">@Rate(group.Summary?.ProfitRate)<p class="is-size-7 @ProfitColor(group.Summary?.ProfitAmount)">@Money(group.Summary?.ProfitAmount)</p></td>
+                                <td class="has-text-right">@(group.Summary is not null && group.BenchmarkWasteRate.HasValue ? group.AttentionStoreCount.ToString(Tr) : "–")</td>
+                                <td>
+                                    @if (group.Period?.Monthly is not null)
+                                    {
+                                        <a class="button is-small is-primary is-light" href="@AnalysisUrl(group.Period.Id)">Analiz</a>
+                                    }
+                                    else if (group.Period?.Cumulative is not null)
+                                    {
+                                        <a class="button is-small is-light" href="@AnalysisUrl(group.Period.Id, type: ReportPeriodType.Cumulative)">Kümülatif</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
-            <div class="column">
-                <div class="box">
-                    <h2 class="title is-5">Rapor kapsamı</h2>
-                    <div class="content">
-                        <p><strong>@_snapshot.Categories.Count.ToString("N0")</strong> kategori</p>
-                        <p><strong>@_snapshot.ProductsByCategory.Values.Sum(rows => rows.Count).ToString("N0")</strong> ürün özeti</p>
-                        <p><strong>@_snapshot.StoreProducts.Select(row => row.StoreNumber).Distinct().Count().ToString("N0")</strong> mağaza</p>
-                    </div>
-                    <hr />
-                    <p class="is-size-7 has-text-grey">@_snapshot.Import.OriginalFileName</p>
-                </div>
+        </section>
+
+        <section id="priority-stores" class="box">
+            <h2 class="title is-5">Öncelikli mağazalar</h2>
+            <p class="is-size-7 has-text-grey mb-4">Önce eşikteki grup sayısına, sonra tek bir gruptaki en yüksek fire kaybına göre sıralanır. Tutarlar gruplar arasında toplanmaz. Yalnızca mazeret kapsamındaki mağazalar yer alır; eşik her grubun genel fire büyüklüğünün @ExcuseOptions.Value.ThresholdMultiplier.ToString("N2", Tr) katıdır.</p>
+            @if (_overview.MissingCount > 0 || _overview.Groups.Any(x => x.Summary is null || !x.BenchmarkWasteRate.HasValue))
+            {
+                <p class="has-text-warning mb-3">Bu liste yalnızca aylık özeti ve genel fire oranı bulunan grupları kapsar; eksik raporlar tamamlandığında değişebilir.</p>
+            }
+            @if (_overview.Stores.Count == 0)
+            {
+                <p>Mevcut verilerde görüntüleme ve mazeret kapsamınızda eşiğe ulaşan mağaza bulunmuyor.</p>
+            }
+            else
+            {
+                @foreach (var store in _overview.Stores.Skip((_storePage - 1) * StorePageSize).Take(StorePageSize))
+                {
+                    <details class="mb-4">
+                        <summary class="is-clickable">
+                            <strong>@store.StoreName</strong>
+                            <span class="tag is-warning is-light ml-2">@store.Reports.Count grupta eşikte</span>
+                            <span class="is-size-7 has-text-grey ml-2">En yüksek grup kaybı: @Money(store.Reports.First().Row.WasteAmount)</span>
+                        </summary>
+                        <div class="table-container mt-3">
+                            <table class="table is-fullwidth is-narrow">
+                                <thead><tr><th>Grup</th><th>Fire tutarı</th><th>Fire oranı</th><th>Mazeret</th><th>İşlem</th></tr></thead>
+                                <tbody>
+                                    @foreach (var report in store.Reports)
+                                    {
+                                        <tr><td>@report.GroupLabel</td><td>@Money(report.Row.WasteAmount)</td><td>@Rate(report.Row.WasteRate)</td><td>@(report.Status.HasValue ? ExcuseDisplayNames.Status(report.Status.Value) : "Talep yok")</td>
+                                            <td><a class="button is-small is-primary is-light" href="@(report.RequestId.HasValue ? $"/mazeretler/{report.RequestId}" : AnalysisUrl(report.PeriodId, store.StoreNumber))">@(report.RequestId.HasValue ? "Mazereti aç" : "Mağazayı incele")</a></td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                }
+                @if (_overview.Stores.Count > StorePageSize)
+                {
+                    <nav class="pagination is-small" aria-label="Öncelikli mağaza sayfaları">
+                        <button class="pagination-previous" disabled="@(_storePage == 1)" @onclick="() => _storePage--">Önceki</button>
+                        <button class="pagination-next" disabled="@(_storePage >= StorePages)" @onclick="() => _storePage++">Sonraki</button>
+                        <span class="pagination-list">@_overview.Stores.Count mağaza · Sayfa @_storePage / @StorePages</span>
+                    </nav>
+                }
+            }
+        </section>
+
+        <section id="pending-work" class="box">
+            <h2 class="title is-5">@(_overview.IsStoreScoped ? "Mağazamın bekleyen işleri" : "Bekleyen işler")</h2>
+            <p class="is-size-7 has-text-grey mb-3">Seçili ayın tüm aktif aylık raporlarına bağlı mazeretler.</p>
+            <div class="buttons">
+                <a class="button is-warning is-light" href="@WorkUrl(ExcuseStatus.Open)">Yanıt bekleyen: @_work?.OpenCount</a>
+                <a class="button is-warning is-light" href="@WorkUrl(ExcuseStatus.RevisionRequested)">Revizyon bekleyen: @_work?.RevisionRequestedCount</a>
+                <a class="button is-info is-light" href="@WorkUrl(ExcuseStatus.Answered)">@(_overview.IsStoreScoped ? "Değerlendirmede" : "Değerlendirme bekleyen"): @_work?.AnsweredCount</a>
+                <a class="button is-light" href="@WorkUrl(null)">Ayın tüm mazeretleri</a>
             </div>
-        </div>
+        </section>
     }
 </div>
 
 @code {
-    private ReportPeriodOption? _period;
-    private ReportSnapshot? _snapshot;
-    private string? _errorMessage;
-    private bool _isLoading = true;
+    private static readonly CultureInfo Tr = CultureInfo.GetCultureInfo("tr-TR");
+    private readonly CancellationTokenSource _cts = new();
+    private readonly List<DateOnly> _months = [];
+    private DateOnly _month;
+    private MonthlyOverview? _overview;
+    private ExcuseListResult? _work;
+    private string? _error;
+    private bool _loading = true;
+    private const int StorePageSize = 10;
+    private int _storePage = 1;
+    private int StorePages => Math.Max(1, ((_overview?.Stores.Count ?? 0) + StorePageSize - 1) / StorePageSize);
+    private string MonthKey => _month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+    private int PendingCount => _overview?.IsStoreScoped == true ? (_work?.OpenCount ?? 0) + (_work?.RevisionRequestedCount ?? 0) : _work?.AnsweredCount ?? 0;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => InitializeAsync();
+
+    private async Task InitializeAsync()
     {
+        _loading = true;
+        _error = null;
         try
         {
-            var periods = await ReportDataService.GetPeriodsAsync();
-            _period = periods.FirstOrDefault();
-            var importItem = _period?.Monthly ?? _period?.Cumulative;
-            if (importItem is not null) _snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
+            var periods = await ReportDataService.GetPeriodsAsync(_cts.Token);
+            _months.Clear();
+            if (periods.Count == 0) { _overview = null; return; }
+            var first = periods.Min(x => new DateOnly(x.EndDate.Year, x.EndDate.Month, 1));
+            var last = periods.Max(x => new DateOnly(x.EndDate.Year, x.EndDate.Month, 1));
+            for (var month = last; month >= first; month = month.AddMonths(-1)) _months.Add(month);
+            if (!_months.Contains(_month)) _month = last;
+            await LoadAsync();
         }
-        catch (Exception exception)
-        {
-            _errorMessage = $"Dashboard verileri yüklenemedi: {exception.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _error = ErrorMessageHelper.GetDetailErrorMessage(ex); }
+        finally { _loading = false; }
     }
 
-    private static string FormatNumber(decimal? value) => value?.ToString("N2") ?? "–";
-    private static string FormatRate(decimal? value) => value.HasValue ? $"% {value:N2}" : "–";
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _storePage = 1;
+        try
+        {
+            var overview = await ReportDataService.GetMonthlyOverviewAsync(_month, ExcuseOptions.Value.ThresholdMultiplier, _cts.Token);
+            var user = (await StateProvider.GetAuthenticationStateAsync()).User;
+            var work = await ExcuseService.GetListAsync(user, null, null, 1, _cts.Token, month: _month);
+            _overview = overview;
+            _work = work;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _error = ErrorMessageHelper.GetDetailErrorMessage(ex); }
+        finally { _loading = false; }
+    }
+
+    private async Task ChangeMonthAsync(ChangeEventArgs args)
+    {
+        if (_loading || !DateOnly.TryParseExact(args.Value?.ToString(), "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month) || !_months.Contains(month)) return;
+        _month = month;
+        await LoadAsync();
+    }
+
+    private static string AnalysisUrl(long period, int? store = null, ReportPeriodType type = ReportPeriodType.Monthly) =>
+        $"/analizler/{period}?type={type}" + (store.HasValue ? $"&store={store}" : "");
+    private string WorkUrl(ExcuseStatus? status) => $"/mazeretler?month={MonthKey}" + (status.HasValue ? $"&status={status}" : "");
+    private static string Money(decimal? value) => value.HasValue ? $"{value.Value.ToString("N2", Tr)} ₺" : "–";
+    private static string Rate(decimal? value) => value.HasValue ? $"%{value.Value.ToString("N2", Tr)}" : "–";
+    private static string ProfitColor(decimal? value) => value < 0 ? "has-text-danger" : value > 0 ? "has-text-success" : "";
+    private static decimal? RateDifference(OverviewReportGroup group) =>
+        group.Summary?.WasteRate is { } current && group.PreviousSummary?.WasteRate is { } previous ? Math.Abs(current) - Math.Abs(previous) : null;
+    private static string ChangeColor(OverviewReportGroup group) => RateDifference(group) is { } difference ?
+        difference > 0 ? "has-text-danger" : difference < 0 ? "has-text-success" : "" : "";
+    private static string RateChange(OverviewReportGroup group) => RateDifference(group) is { } difference ?
+        difference == 0 ? "Değişmedi" : $"{Math.Abs(difference).ToString("N2", Tr)} yüzde puan {(difference > 0 ? "artış" : "azalış")}" :
+        group.Summary is null ? "–" : "Karşılaştırılabilir önceki ay yok";
+    public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
 }
