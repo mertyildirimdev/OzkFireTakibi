@@ -76,7 +76,7 @@
             <p class="mb-3">
                 @if (_overview.ComparableCount > 0)
                 {
-                    <span>Önceki ayla karşılaştırılabilen @_overview.ComparableCount grubun <strong class="has-text-success">@_overview.ImprovedCount tanesinde fire oranı azaldı</strong>, <strong class="has-text-danger">@_overview.WorsenedCount tanesinde arttı</strong>.</span>
+                    <span>Önceki ayla karşılaştırılabilen @_overview.ComparableCount grubun <strong class="has-text-success">@_overview.ImprovedCount tanesinde fire oranı azaldı</strong>, <strong class="has-text-danger">@_overview.WorsenedCount tanesinde arttı</strong>, @(_overview.ComparableCount - _overview.ImprovedCount - _overview.WorsenedCount) tanesinde değişmedi.</span>
                 }
                 else
                 {

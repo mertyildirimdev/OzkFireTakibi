@@ -84,9 +84,6 @@ public sealed class ReportDataService(IDbContextFactory<AppDbContext> dbContextF
         var snapshot = new ReportSnapshot
         {
             IsStoreScoped = isStore,
-            // Yalnızca eşik karşılaştırması için raporun genel oranı paylaşılır, başka mağaza satırları paylaşılmaz.
-            BenchmarkWasteRate = await dbContext.ReportRows.Where(x => x.ReportImportId == importId && x.RowType == ReportRowType.General)
-                .Select(x => x.WasteRate).SingleOrDefaultAsync(cancellationToken),
             Import = ToOption(importItem)!,
             Rows = rows,
             General = general,
@@ -101,27 +98,6 @@ public sealed class ReportDataService(IDbContextFactory<AppDbContext> dbContextF
 
         memoryCache.Set(cacheKey, snapshot, TimeSpan.FromMinutes(20));
         return snapshot;
-    }
-
-    public async Task<IReadOnlyList<AttentionStore>> GetAttentionStoresAsync(long importId, decimal multiplier, CancellationToken cancellationToken = default)
-    {
-        var snapshot = await GetSnapshotAsync(importId, cancellationToken);
-        if (snapshot.BenchmarkWasteRate is not { } benchmark) return [];
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var eligible = await db.Stores.Where(x => x.IsExcuseEligible).Select(x => x.Id).ToArrayAsync(cancellationToken);
-        var rows = snapshot.Rows.Where(x => x.RowType == ReportRowType.StoreSummary && x.StoreNumber.HasValue &&
-            eligible.Contains(x.StoreNumber.Value) && x.WasteRate < 0m &&
-            Math.Abs(x.WasteRate.Value) >= Math.Abs(benchmark) * multiplier)
-            .OrderByDescending(x => Math.Abs(x.WasteAmount ?? 0m)).ToArray();
-        var rowIds = rows.Select(x => x.Id).ToArray();
-        var requests = await db.ExcuseRequests.AsNoTracking().Where(x => rowIds.Contains(x.ReportRowId) &&
-            x.Status != ExcuseStatus.Superseded).OrderByDescending(x => x.Id)
-            .Select(x => new { x.Id, x.ReportRowId, x.Status }).ToArrayAsync(cancellationToken);
-        return rows.Select(row =>
-        {
-            var request = requests.FirstOrDefault(x => x.ReportRowId == row.Id);
-            return new AttentionStore(row, request?.Id, request?.Status);
-        }).ToArray();
     }
 
     public async Task<MonthlyOverview> GetMonthlyOverviewAsync(DateOnly month, decimal multiplier,

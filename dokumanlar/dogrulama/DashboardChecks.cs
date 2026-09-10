@@ -44,7 +44,7 @@ public static class DashboardChecks
         Check(periods.Count == 3 && periods[0].Label != periods[1].Label, "Same-month category scopes have distinct labels");
         var central = await data.GetSnapshotAsync(1);
         Check(central.General.WasteAmount == -10000 && central.Rows.Any(x => x.StoreNumber == 65), "Central report retains all stores");
-        var attention = await data.GetAttentionStoresAsync(1, 1.5m);
+        var attention = (await data.GetMonthlyOverviewAsync(new DateOnly(2026, 5, 1), 1.5m)).Stores.SelectMany(x => x.Reports).Where(x => x.PeriodId == 1).ToArray();
         Check(attention.Any(x => x.Row.StoreNumber == 1) && attention.All(x => x.Row.StoreNumber != 2), "Threshold equality matches automation; excluded stores are omitted");
         Check(attention.First().RequestId.HasValue, "Priority stores link to their request");
         state.User = User("User", 1);

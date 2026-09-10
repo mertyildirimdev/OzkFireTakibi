@@ -240,9 +240,11 @@
             if (type == ImportPeriodType.Monthly) { monthlyTemporaryFilePath = path; monthlyFileName = file.Name; }
             else { cumulativeTemporaryFilePath = path; cumulativeFileName = file.Name; }
 
-            await using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
-            await using var source = file.OpenReadStream(ImportOptions.Value.MaxFileSizeBytes);
-            await source.CopyToAsync(target, cancellationTokenSource.Token);
+            await using (var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            await using (var source = file.OpenReadStream(ImportOptions.Value.MaxFileSizeBytes))
+            {
+                await source.CopyToAsync(target, cancellationTokenSource.Token);
+            }
 
             if (monthlyTemporaryFilePath is not null && cumulativeTemporaryFilePath is not null && monthlyFileName is not null && cumulativeFileName is not null)
             {
