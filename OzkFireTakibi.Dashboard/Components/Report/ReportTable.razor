@@ -1,0 +1,182 @@
+<div class="table-container report-table-container">
+    <table class="table is-fullwidth is-hoverable is-striped is-narrow">
+        <thead>
+            <tr>
+                @for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
+                {
+                    var column = Columns[columnIndex];
+                    <th @key="column.Key" scope="col" class="@(columnIndex == 0 ? "sticky-column" : null) @(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
+                        <ColumnFilterMenu Column="column"
+                                          AlignRight="@(columnIndex >= 2)"
+                                          Values="GetDistinctValues(column)"
+                                          ActiveValues="GetActiveValues(column.Key)"
+                                          OnSort="direction => SortAsync(column.Key, direction)"
+                                          OnFilter="values => FilterAsync(column.Key, values)" />
+                    </th>
+                }
+                @if (CanRequestExcuse)
+                {
+                    <th class="has-text-right">İşlem</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in DisplayedRows)
+            {
+                var isSelected = _selectedRowIds.Contains(row.Id);
+                <tr @key="row" class="@(row == _pinnedRow ? "pinned-row" : null) @(isSelected ? "has-background-primary-light" : null)">
+                    @for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
+                    {
+                        var column = Columns[columnIndex];
+                        <td class="@(columnIndex == 0 ? "sticky-column" : null) @(isSelected ? "has-background-primary-light" : null) @(column.DataType == ColumnDataType.Text ? null : "has-text-right")">
+                            @if (columnIndex == 0)
+                            {
+                                <input class="mr-2" type="checkbox" checked="@isSelected"
+                                       aria-label="@($"{row.SourceRowNumber}. satırı vurgula")"
+                                       title="Satırı vurgula"
+                                       @onchange="args => SelectRow(row.Id, args.Value is true)" />
+                            }
+                            <button class="button is-ghost is-small p-0 has-text-text" type="button"
+                                    title="@($"{column.Label}: {column.Format(row)} değerine göre filtrele")"
+                                    aria-label="@($"{column.Label}: {column.Format(row)} değerine göre filtrele")"
+                                    @onclick="() => FilterAsync(column.Key, new HashSet<string> { column.ValueKey(row) })">
+                                @column.Format(row)
+                            </button>
+                        </td>
+                    }
+                    @if (CanRequestExcuse)
+                    {
+                        <td class="has-text-right">
+                            @if (CanCreateExcuse(row))
+                            {
+                                <button class="button is-small is-warning is-light" type="button" @onclick="() => OnExcuseRequested.InvokeAsync(row)">
+                                    <span class="icon"><i class="fas fa-comment-dots"></i></span><span>Mazeret iste</span>
+                                </button>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+            @if (_rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="@ColumnCount" class="has-text-centered has-text-grey py-5">Seçilen filtrelere uygun satır bulunamadı.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="is-size-7 has-text-grey mt-3" aria-live="polite">
+    @_rows.Count.ToString("N0") satır
+    @if (_pinnedRow is not null)
+    {
+        <span> · 1 sabit satır</span>
+    }
+</p>
+
+@code {
+    [Parameter, EditorRequired] public ReportSnapshot Snapshot { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyList<ColumnDefinition> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, IReadOnlySet<string>> Filters { get; set; }
+        = new Dictionary<string, IReadOnlySet<string>>();
+    [Parameter] public SortRule? Sort { get; set; }
+    [Parameter] public string GlobalSearch { get; set; } = string.Empty;
+    [Parameter] public EventCallback<SortRule> OnSortChanged { get; set; }
+    [Parameter] public EventCallback<ColumnFilterChange> OnFilterChanged { get; set; }
+    [Parameter] public bool CanRequestExcuse { get; set; }
+    [Parameter] public EventCallback<ReportRowEntity> OnExcuseRequested { get; set; }
+
+    private IReadOnlyList<ReportRowEntity> _rows = [];
+    private ReportRowEntity? _pinnedRow;
+    private IEnumerable<ReportRowEntity> DisplayedRows => _pinnedRow is null ? _rows : _rows.Prepend(_pinnedRow);
+    private readonly HashSet<long> _selectedRowIds = [];
+    private long _snapshotImportId;
+    private int ColumnCount => Columns.Count + (CanRequestExcuse ? 1 : 0);
+
+    protected override void OnParametersSet()
+    {
+        if (_snapshotImportId != Snapshot.Import.Id)
+        {
+            _snapshotImportId = Snapshot.Import.Id;
+            _selectedRowIds.Clear();
+        }
+        _pinnedRow = Snapshot.Rows.MinBy(row => row.SourceRowNumber);
+        _rows = SortRows(Snapshot.Rows.Where(row => row != _pinnedRow && MatchesGlobalSearch(row) && MatchesFilters(row))).ToArray();
+    }
+
+    private void SelectRow(long rowId, bool isSelected)
+    {
+        if (isSelected) _selectedRowIds.Add(rowId);
+        else _selectedRowIds.Remove(rowId);
+    }
+
+    private IReadOnlyList<DistinctValue> GetDistinctValues(ColumnDefinition column)
+    {
+        return Snapshot.Rows
+            .Where(MatchesGlobalSearch)
+            .Where(row => MatchesFilters(row, column.Key))
+            .GroupBy(column.ValueKey)
+            .Select(group => new DistinctValue(
+                group.Key,
+                string.IsNullOrWhiteSpace(group.Key) ? "Tümü" : column.Format(group.First()),
+                group.Count()))
+            .OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    private IReadOnlySet<string>? GetActiveValues(string columnKey) => Filters.GetValueOrDefault(columnKey);
+
+    private bool MatchesFilters(ReportRowEntity row, string? excludedColumn = null)
+    {
+        foreach (var filter in Filters)
+        {
+            if (filter.Key == excludedColumn) continue;
+            var column = ReportColumnCatalog.All.First(item => item.Key == filter.Key);
+            if (!filter.Value.Contains(column.ValueKey(row))) return false;
+        }
+
+        return true;
+    }
+
+    private bool MatchesGlobalSearch(ReportRowEntity row)
+    {
+        if (string.IsNullOrWhiteSpace(GlobalSearch)) return true;
+        return new[]
+            {
+                row.SourceReportType, row.CategoryCode, row.CategoryName, row.StockCode, row.StockName,
+                row.StoreName, row.StoreNumber?.ToString()
+            }
+            .Any(value => value?.Contains(GlobalSearch, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+
+    private IEnumerable<ReportRowEntity> SortRows(IEnumerable<ReportRowEntity> rows)
+    {
+        if (Sort is null) return rows.OrderBy(row => row.SourceRowNumber);
+        var column = ReportColumnCatalog.All.First(item => item.Key == Sort.ColumnKey);
+        return Sort.Direction == SortDirection.Ascending
+            ? rows.OrderBy(column.Value, ObjectValueComparer.Instance).ThenBy(row => row.SourceRowNumber)
+            : rows.OrderByDescending(column.Value, ObjectValueComparer.Instance).ThenBy(row => row.SourceRowNumber);
+    }
+
+    private Task SortAsync(string columnKey, SortDirection direction) => OnSortChanged.InvokeAsync(new SortRule(columnKey, direction));
+    private Task FilterAsync(string columnKey, IReadOnlySet<string>? values) => OnFilterChanged.InvokeAsync(new ColumnFilterChange(columnKey, values));
+
+    private static bool CanCreateExcuse(ReportRowEntity row) => row.RowType is
+        ReportRowType.StoreCategory or ReportRowType.StoreProduct;
+
+    private sealed class ObjectValueComparer : IComparer<object?>
+    {
+        public static readonly ObjectValueComparer Instance = new();
+
+        public int Compare(object? x, object? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return 1;
+            if (y is null) return -1;
+            if (x is decimal xDecimal && y is decimal yDecimal) return xDecimal.CompareTo(yDecimal);
+            if (x is int xInt && y is int yInt) return xInt.CompareTo(yInt);
+            return StringComparer.CurrentCultureIgnoreCase.Compare(x.ToString(), y.ToString());
+        }
+    }
+}

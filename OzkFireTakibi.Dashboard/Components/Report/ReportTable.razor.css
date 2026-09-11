@@ -1,0 +1,47 @@
+.report-table-container {
+    height: calc(100dvh - 18rem);
+    min-height: 24rem;
+    overflow: auto;
+}
+
+table {
+    --report-header-height: 2.5rem;
+    white-space: nowrap;
+}
+
+thead th {
+    height: var(--report-header-height);
+    background: var(--bulma-scheme-main);
+    position: sticky;
+    top: 0;
+    z-index: 4;
+}
+
+.sticky-column {
+    position: sticky;
+    left: 0;
+}
+
+tbody .sticky-column {
+    background: var(--bulma-scheme-main);
+    z-index: 1;
+}
+
+thead .sticky-column {
+    z-index: 5;
+}
+
+thead th:focus-within {
+    z-index: 6;
+}
+
+.pinned-row td {
+    position: sticky;
+    top: var(--report-header-height);
+    background: var(--bulma-scheme-main);
+    z-index: 2;
+}
+
+.pinned-row .sticky-column {
+    z-index: 3;
+}

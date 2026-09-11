@@ -76,10 +76,11 @@ public static class ReportColumnCatalog
 {
     public static readonly IReadOnlyList<ColumnDefinition> All =
     [
+        new("reportType", "Rapor türü", ColumnDataType.Text, row => row.SourceReportType, true),
         new("storeNumber", "Depo No", ColumnDataType.Number, row => row.StoreNumber),
-        new("storeName", "Depo Adı", ColumnDataType.Text, row => row.StoreName),
+        new("storeName", "Depo Adı", ColumnDataType.Text, row => row.StoreName, true),
         new("categoryCode", "Kategori Kodu", ColumnDataType.Text, row => row.CategoryCode),
-        new("categoryName", "Kategori İsmi", ColumnDataType.Text, row => row.CategoryName),
+        new("categoryName", "Kategori İsmi", ColumnDataType.Text, row => row.CategoryName, true),
         new("stockCode", "Stok Kodu", ColumnDataType.Text, row => row.StockCode),
         new("stockName", "Stok İsmi", ColumnDataType.Text, row => row.StockName),
         new("alternativeName", "Alternatif İsim", ColumnDataType.Text, row => row.AlternativeName),
