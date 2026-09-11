@@ -1,5 +1,5 @@
 .dropdown-content {
-    min-width: 20rem;
+    min-width: min(24rem, calc(100vw - 3rem));
 }
 
 .distinct-values {

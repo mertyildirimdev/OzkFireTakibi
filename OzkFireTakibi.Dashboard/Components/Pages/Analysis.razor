@@ -10,21 +10,70 @@
 }
 else if (_error is not null)
 {
-    <div class="container"><h1 class="title is-3">Analizler</h1><div class="notification is-danger is-light">@_error</div>
-        <button class="button" @onclick="LoadAsync">Tekrar dene</button></div>
+    <div class="container">
+        <h1 class="title is-3">Analizler</h1>
+        <div class="notification is-danger is-light">@_error</div>
+        <div class="buttons">
+            <button class="button" @onclick="LoadAsync">Tekrar dene</button>
+            @if (PeriodId.HasValue)
+            {
+                <a class="button is-light" href="/analizler">Analizlere dön</a>
+            }
+        </div>
+    </div>
 }
-else if (_periodId is null)
+else if (PeriodId is null)
 {
     <div class="container">
-        <p class="has-text-primary has-text-weight-semibold mb-2">ANALİZ</p>
-        <h1 class="title is-2">Fire ve kârlılık verileri</h1>
-        <div class="notification is-info is-light">Görüntüleme kapsamınızda aktif rapor bulunmuyor. Mağaza kullanıcısıysanız mağaza eşlemenizi kontrol ettirin.</div>
-        <AuthorizeView Policy="@ReportPolicies.CanImportReports"><Authorized><a class="button is-primary" href="/raporlar">Rapor yükle</a></Authorized></AuthorizeView>
+        <h1 class="title is-3">Analizler</h1>
+        <p class="subtitle is-6 has-text-grey">İncelemek istediğiniz analizi seçin.</p>
+
+        @if (_periods.Count == 0)
+        {
+            <div class="notification is-info is-light">Görüntüleme kapsamınızda aktif rapor bulunmuyor. Mağaza kullanıcısıysanız mağaza eşlemenizi kontrol ettirin.</div>
+            <AuthorizeView Policy="@ReportPolicies.CanImportReports"><Authorized><a class="button is-primary" href="/raporlar">Rapor yükle</a></Authorized></AuthorizeView>
+        }
+        else
+        {
+            <nav class="panel" aria-label="Analiz listesi">
+                @foreach (var period in _periods)
+                {
+                    <a @key="period.Id" class="panel-block p-4" href="@($"/analizler/{period.Id}")">
+                        <span class="panel-icon has-text-primary" aria-hidden="true">
+                            <i class="fas fa-chart-column"></i>
+                        </span>
+                        <span class="is-flex-grow-1">
+                            <span class="is-block has-text-weight-semibold">@AnalysisName(period)</span>
+                            <span class="is-block is-size-7 has-text-grey mt-1">
+                                @period.EndDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))
+                            </span>
+                            <span class="tags mt-2 mb-0">
+                                @if (period.Monthly is not null)
+                                {
+                                    <span class="tag is-light mb-0">Aylık</span>
+                                }
+                                @if (period.Cumulative is not null)
+                                {
+                                    <span class="tag is-light mb-0">Kümülatif</span>
+                                }
+                            </span>
+                        </span>
+                        <span class="icon has-text-grey ml-3" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+                    </a>
+                }
+            </nav>
+        }
     </div>
 }
 else
 {
-    <ReportWorkspace PeriodId="_periodId.Value" RouteBase="/analizler" InitialType="Type" InitialStore="Store" />
+    <div class="container is-fluid mb-4">
+        <a class="icon-text" href="/analizler">
+            <span class="icon" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
+            <span>Analizlere dön</span>
+        </a>
+    </div>
+    <ReportWorkspace PeriodId="PeriodId.Value" InitialType="Type" InitialStore="Store" />
 }
 
 @code {
@@ -33,10 +82,15 @@ else
     [SupplyParameterFromQuery(Name = "store")] public int? Store { get; set; }
     private string? _error;
     private int _loadVersion;
-    private long? _periodId;
+    private IReadOnlyList<ReportPeriodOption> _periods = [];
     private bool _isLoading = true;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private static string AnalysisName(ReportPeriodOption period) =>
+        string.IsNullOrWhiteSpace(period.ScopeLabel)
+            ? (period.Monthly ?? period.Cumulative)?.OriginalFileName ?? "Analiz"
+            : period.ScopeLabel;
 
     private async Task LoadAsync()
     {
@@ -50,7 +104,7 @@ else
             if (version != _loadVersion) return;
             if (id.HasValue && !periods.Any(x => x.Id == id.Value))
                 throw new UnauthorizedAccessException("Seçilen dönem bulunamadı veya bu döneme erişiminiz yok.");
-            _periodId = id ?? periods.FirstOrDefault()?.Id;
+            _periods = periods;
         }
         catch (Exception ex) { if (version == _loadVersion) _error = ErrorMessageHelper.GetDetailErrorMessage(ex); }
         finally { if (version == _loadVersion) _isLoading = false; }

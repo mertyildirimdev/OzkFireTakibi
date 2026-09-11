@@ -1,4 +1,4 @@
-<div class="dropdown is-right @(IsOpen ? "is-active" : null)">
+<div class="dropdown @(AlignRight ? "is-right" : null) @(IsOpen ? "is-active" : null)">
     <div class="dropdown-trigger">
         <button class="button is-small @(IsFiltered ? "is-primary is-light" : "is-white")" type="button"
                 aria-haspopup="true" aria-expanded="@IsOpen" title="@Column.Label filtresi" @onclick="ToggleMenu">
@@ -17,13 +17,19 @@
     {
         <div class="dropdown-menu" role="menu">
             <div class="dropdown-content p-3">
-                <div class="buttons are-small mb-3">
-                    <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Ascending)">
-                        <span class="icon"><i class="fas fa-arrow-up-a-z"></i></span><span>Artan</span>
-                    </button>
-                    <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Descending)">
-                        <span class="icon"><i class="fas fa-arrow-down-z-a"></i></span><span>Azalan</span>
-                    </button>
+                <div class="is-flex is-flex-wrap-wrap is-justify-content-space-between mb-3">
+                    <div class="buttons are-small mb-0">
+                        <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Ascending)">
+                            <span class="icon"><i class="fas fa-arrow-up-a-z"></i></span><span>Artan</span>
+                        </button>
+                        <button class="button" type="button" @onclick="() => SortAsync(SortDirection.Descending)">
+                            <span class="icon"><i class="fas fa-arrow-down-z-a"></i></span><span>Azalan</span>
+                        </button>
+                    </div>
+                    <div class="buttons are-small mb-0">
+                        <button class="button" type="button" @onclick="CloseMenu">Vazgeç</button>
+                        <button class="button is-primary" type="button" @onclick="ApplyAsync">Uygula</button>
+                    </div>
                 </div>
                 <div class="field mb-3">
                     <div class="control has-icons-left">
@@ -52,10 +58,6 @@
                 {
                     <p class="help mb-3">İlk @MaximumDisplayedValues değer gösteriliyor. Arama yazarak listeyi daraltın.</p>
                 }
-                <div class="buttons is-right mb-0">
-                    <button class="button is-small" type="button" @onclick="CloseMenu">Vazgeç</button>
-                    <button class="button is-primary is-small" type="button" @onclick="ApplyAsync">Uygula</button>
-                </div>
             </div>
         </div>
     }
@@ -65,6 +67,7 @@
     [Parameter, EditorRequired] public ColumnDefinition Column { get; set; } = default!;
     [Parameter, EditorRequired] public IReadOnlyList<DistinctValue> Values { get; set; } = [];
     [Parameter] public IReadOnlySet<string>? ActiveValues { get; set; }
+    [Parameter] public bool AlignRight { get; set; } = true;
     [Parameter] public EventCallback<SortDirection> OnSort { get; set; }
     [Parameter] public EventCallback<IReadOnlySet<string>?> OnFilter { get; set; }
 

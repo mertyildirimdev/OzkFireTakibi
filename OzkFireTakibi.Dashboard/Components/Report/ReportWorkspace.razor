@@ -20,28 +20,6 @@
         {
             <div class="notification is-success is-light">@_successMessage</div>
         }
-        <div class="level mb-4">
-            <div class="level-left">
-                <div>
-                    <h1 class="title is-3 mb-1">Fire ve kârlılık analizi</h1>
-                    <p class="subtitle is-6 has-text-grey">@_snapshot.Import.OriginalFileName</p>
-                </div>
-            </div>
-            <div class="level-right">
-                <div class="field">
-                    <label class="label is-small" for="period-select">Dönem</label>
-                    <div class="select">
-                        <select id="period-select" value="@_period.Id" @onchange="ChangePeriod">
-                            @foreach (var period in _periods)
-                            {
-                                <option value="@period.Id">@period.Label</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="box mb-4">
             <div class="level is-mobile mb-4">
                 <div class="level-left">
@@ -116,18 +94,16 @@
 
 @code {
     [Parameter] public long PeriodId { get; set; }
-    [Parameter] public string RouteBase { get; set; } = "/analizler";
     [Parameter] public string? InitialType { get; set; }
     [Parameter] public int? InitialStore { get; set; }
     private string? _loadedType;
     private int? _loadedStore;
     private int _loadVersion;
 
-    private IReadOnlyList<ReportPeriodOption> _periods = [];
     private ReportPeriodOption? _period;
     private ReportSnapshot? _snapshot;
     private ReportPeriodType _selectedType;
-    private readonly HashSet<string> _selectedFieldKeys = ReportColumnCatalog.All.Where(x => x.IsDefault).Select(x => x.Key).ToHashSet();
+    private readonly HashSet<string> _selectedFieldKeys = ReportColumnCatalog.All.Select(x => x.Key).ToHashSet();
     private readonly Dictionary<string, IReadOnlySet<string>> _filters = [];
     private SortRule? _sort;
     private string _globalSearch = string.Empty;
@@ -168,8 +144,7 @@
         {
             var periods = await ReportDataService.GetPeriodsAsync();
             if (version != _loadVersion) return;
-            _periods = periods;
-            _period = _periods.FirstOrDefault(x => x.Id == requestedPeriod);
+            _period = periods.FirstOrDefault(x => x.Id == requestedPeriod);
             if (_period is null) throw new InvalidOperationException("Görüntülenecek aktif rapor bulunamadı.");
             _loadedPeriodId = _period.Id;
             _selectedType = _period.Monthly is not null ? ReportPeriodType.Monthly : ReportPeriodType.Cumulative;
@@ -210,11 +185,6 @@
         if (importItem is null) throw new InvalidOperationException("Seçilen rapor türü bu dönemde bulunmuyor.");
         var snapshot = await ReportDataService.GetSnapshotAsync(importItem.Id);
         if (version == _loadVersion) _snapshot = snapshot;
-    }
-
-    private void ChangePeriod(ChangeEventArgs args)
-    {
-        if (long.TryParse(args.Value?.ToString(), out var periodId)) NavigationManager.NavigateTo($"{RouteBase}/{periodId}");
     }
 
     private void HandleSortChanged(SortRule rule) => _sort = rule;

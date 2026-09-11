@@ -58,11 +58,11 @@ public sealed record ColumnDefinition(
     {
         return value switch
         {
-            null => "–",
+            null => "Tümü",
             decimal number when DataType == ColumnDataType.Percentage => $"% {number:N2}",
             decimal number => number.ToString("N2"),
             int number => number.ToString("N0"),
-            _ => Convert.ToString(value, CultureInfo.CurrentCulture) ?? "–"
+            _ => Convert.ToString(value, CultureInfo.CurrentCulture) ?? "Tümü"
         };
     }
 }
